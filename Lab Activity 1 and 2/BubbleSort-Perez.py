@@ -1,4 +1,5 @@
 import time
+import os
 
 def bubble_sort_descending(arr):
     """
@@ -50,7 +51,7 @@ def read_dataset(filename):
 
 if __name__ == "__main__":
     # Read dataset from file
-    dataset = read_dataset('dataset.txt')
+    dataset = read_dataset(os.path.join(os.path.dirname(__file__), 'dataset.txt'))
     print(f"Original dataset size: {len(dataset)}")
     print(f"Unsorted Elements: {dataset[:10000]}")
 
