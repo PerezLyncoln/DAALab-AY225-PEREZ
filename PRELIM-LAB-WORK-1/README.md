@@ -9,6 +9,6 @@ This program implements the bubble sort algorithm to sort a 10k dataset in desce
 ## How to Run
 1. Ensure `dataset.txt` is in the same directory as `BubbleSort-Perez.py`.
 2. Open a terminal in this directory.
-3. Run the command: `python BubbleSort-Perez.py`
+3. Run the command through either copying the relative file path of the code and running the command `python relative_file_path` in the terminal or `pressing the run button`.
 
 The program will output the original dataset size, the first 10,000 unsorted elements, and then the sorted results with timing information.
