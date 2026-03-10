@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Route Optimizer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #10141c;
+    --panel: #141920;
+    --border: #1e2836;
+    --accent: #00e5ff;
+    --accent3: #7fff6b;
+    --gold: #ffd166;
+    --text: #c8d8e8;
+    --muted: #4a5f72;
+    --dist-color: #00e5ff;
+    --time-color: #ff6b35;
+    --fuel-color: #7fff6b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 32px 24px; }
+
+  /* Header */
+  header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .logo-block h1 { font-size: 2rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; }
+  .logo-block h1 span { color: var(--accent); font-family: 'Share Tech Mono', monospace; }
+  .logo-block p { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted); margin-top: 4px; }
+  .status-bar { font-family: 'Share Tech Mono', monospace; font-size: 0.72rem; color: var(--muted); text-align: right; line-height: 1.8; }
+  .status-bar .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
+  .status-bar .dot.active { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+
+  /* Upload */
+  .upload-zone { border: 1.5px dashed var(--border); border-radius: 4px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--surface); position: relative; overflow: hidden; }
+  .upload-zone::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(0,229,255,0.04) 0%, transparent 60%); pointer-events: none; }
+  .upload-zone:hover, .upload-zone.drag-over { border-color: var(--accent); background: #0d1620; }
+  .upload-zone input { display: none; }
+  .upload-icon { width: 52px; height: 52px; margin: 0 auto 16px; border: 1.5px solid var(--border); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; }
+  .upload-zone h3 { font-size: 1rem; font-weight: 600; color: #fff; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .upload-zone p { font-size: 0.8rem; color: var(--muted); }
+  .upload-zone .badge { display: inline-block; margin-top: 12px; padding: 3px 10px; font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; border: 1px solid var(--border); border-radius: 2px; color: var(--muted); letter-spacing: 0.15em; }
+
+  /* Controls */
+  .controls { display: grid; grid-template-columns: 1fr auto; gap: 16px; margin-top: 24px; align-items: end; }
+  .field-group { display: flex; flex-direction: column; gap: 8px; }
+  label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); font-family: 'Share Tech Mono', monospace; }
+  select { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 0.88rem; padding: 10px 14px; border-radius: 3px; outline: none; transition: border-color 0.2s; width: 100%; appearance: none; -webkit-appearance: none; }
+  select:focus { border-color: var(--accent); }
+  .btn { padding: 11px 28px; background: var(--accent); color: #000; border: none; font-family: 'Barlow', sans-serif; font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.14em; border-radius: 3px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { background: #33ecff; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+  /* Section title */
+  .section-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted); font-family: 'Share Tech Mono', monospace; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* Data preview */
+  .data-preview { margin-top: 32px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; font-family: 'Share Tech Mono', monospace; }
+  thead th { background: #0d1218; padding: 10px 16px; text-align: left; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid rgba(30,40,54,0.7); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(0,229,255,0.03); }
+  tbody td { padding: 9px 16px; color: var(--text); }
+  tbody td:first-child { color: var(--accent); }
+
+  /* Graph */
+  .graph-section { margin-top: 32px; }
+  #graphCanvas { width: 100%; height: 420px; display: block; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); }
+
+  /* Winner banner */
+  .winner-banner { background: linear-gradient(135deg, rgba(255,209,102,0.08) 0%, rgba(255,209,102,0.02) 100%); border: 1px solid rgba(255,209,102,0.3); border-radius: 4px; padding: 20px 24px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; margin-bottom: 24px; }
+  .winner-crown { font-size: 2.2rem; flex-shrink: 0; }
+  .winner-info { flex: 1; min-width: 180px; }
+  .winner-info .winner-label { font-family: 'Share Tech Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 4px; }
+  .winner-info .winner-node { font-size: 1.7rem; font-weight: 700; color: var(--gold); font-family: 'Share Tech Mono', monospace; }
+  .winner-info .winner-desc { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  .winner-scores { display: flex; gap: 14px; flex-wrap: wrap; }
+  .winner-score-item { text-align: center; padding: 10px 16px; background: rgba(0,0,0,0.25); border-radius: 3px; border: 1px solid var(--border); min-width: 90px; }
+  .winner-score-item .ws-label { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 5px; }
+  .winner-score-item .ws-val { font-family: 'Share Tech Mono', monospace; font-size: 0.88rem; font-weight: 700; }
+  .winner-score-item.dist .ws-val { color: var(--dist-color); }
+  .winner-score-item.time .ws-val { color: var(--time-color); }
+  .winner-score-item.fuel .ws-val { color: var(--fuel-color); }
+
+  /* Ranking table */
+  .ranking-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 28px; }
+  .ranking-table { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 0.78rem; }
+  .ranking-table thead th { background: #0d1218; padding: 10px 14px; text-align: center; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .ranking-table thead th:first-child { text-align: left; }
+  .ranking-table tbody tr { border-bottom: 1px solid rgba(30,40,54,0.5); transition: background 0.15s; }
+  .ranking-table tbody tr:last-child { border-bottom: none; }
+  .ranking-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .ranking-table tbody td { padding: 9px 14px; text-align: center; }
+  .ranking-table tbody td:first-child { text-align: left; color: #fff; }
+  .rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; font-size: 0.65rem; font-weight: 700; margin-right: 8px; }
+  .rank-badge.r1 { background: var(--gold); color: #000; }
+  .rank-badge.r2 { background: #b0b8c8; color: #000; }
+  .rank-badge.r3 { background: #cd7f32; color: #000; }
+  .rank-badge.rn { background: var(--border); color: var(--muted); }
+  .best-cell { font-weight: 700; }
+  .best-cell.dist { color: var(--dist-color); }
+  .best-cell.time { color: var(--time-color); }
+  .best-cell.fuel { color: var(--fuel-color); }
+  .best-cell.overall { color: var(--gold); }
+  .crown-tag { font-size: 0.75rem; margin-left: 4px; }
+
+  /* Results grid */
+  .results-section { margin-top: 32px; }
+  .results-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .metric-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .metric-header { padding: 14px 18px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .metric-icon { width: 32px; height: 32px; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+  .metric-header .metric-name { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.18em; font-family: 'Share Tech Mono', monospace; color: var(--muted); }
+  .metric-header .metric-label { font-size: 0.95rem; font-weight: 600; color: #fff; }
+  .metric-header .best-node-tag { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .metric-header .best-node-tag .bnt-label { font-family: 'Share Tech Mono', monospace; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); }
+  .metric-header .best-node-tag .bnt-val { font-family: 'Share Tech Mono', monospace; font-size: 0.9rem; font-weight: 700; }
+  .metric-panel.dist .metric-icon { background: rgba(0,229,255,0.1); color: var(--dist-color); }
+  .metric-panel.time .metric-icon { background: rgba(255,107,53,0.1); color: var(--time-color); }
+  .metric-panel.fuel .metric-icon { background: rgba(127,255,107,0.1); color: var(--fuel-color); }
+  .metric-panel.dist { border-top: 2px solid var(--dist-color); }
+  .metric-panel.time { border-top: 2px solid var(--time-color); }
+  .metric-panel.fuel { border-top: 2px solid var(--fuel-color); }
+  .metric-panel.dist .bnt-val { color: var(--dist-color); }
+  .metric-panel.time .bnt-val { color: var(--time-color); }
+  .metric-panel.fuel .bnt-val { color: var(--fuel-color); }
+
+  .route-list { padding: 14px 0; }
+  .route-item { padding: 10px 18px; border-bottom: 1px solid rgba(30,40,54,0.5); transition: background 0.15s; cursor: pointer; }
+  .route-item:last-child { border-bottom: none; }
+  .route-item:hover { background: rgba(255,255,255,0.04); outline: 1px solid rgba(255,255,255,0.06); }
+  .route-dest { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .route-dest .dest-name { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.12em; color: #fff; font-family: 'Share Tech Mono', monospace; }
+  .route-dest .dest-value { font-family: 'Share Tech Mono', monospace; font-size: 0.82rem; font-weight: 600; }
+  .metric-panel.dist .dest-value { color: var(--dist-color); }
+  .metric-panel.time .dest-value { color: var(--time-color); }
+  .metric-panel.fuel .dest-value { color: var(--fuel-color); }
+  .route-path { font-family: 'Share Tech Mono', monospace; font-size: 0.7rem; color: var(--muted); display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .route-path .node-chip { padding: 2px 7px; border-radius: 2px; font-size: 0.68rem; }
+  .metric-panel.dist .node-chip { background: rgba(0,229,255,0.1); color: var(--dist-color); }
+  .metric-panel.time .node-chip { background: rgba(255,107,53,0.1); color: var(--time-color); }
+  .metric-panel.fuel .node-chip { background: rgba(127,255,107,0.1); color: var(--fuel-color); }
+  .route-path .arrow { color: var(--muted); font-size: 0.65rem; }
+  .no-data { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 0.8rem; font-family: 'Share Tech Mono', monospace; letter-spacing: 0.1em; }
+
+  .alt-toggle { margin-top: 6px; font-size: 0.65rem; font-family: 'Share Tech Mono', monospace; color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; text-decoration: underline; text-underline-offset: 3px; }
+  .alt-paths { display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .alt-paths.open { display: block; }
+  .alt-path-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; color: var(--muted); }
+
+  /* Total footer */
+  .metric-total { border-top: 1px solid var(--border); padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; background: rgba(0,0,0,0.2); }
+  .metric-total .total-label { font-family: 'Share Tech Mono', monospace; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .metric-total .total-label::before { content: 'Σ'; font-size: 0.85rem; }
+  .metric-total .total-value { font-family: 'Share Tech Mono', monospace; font-size: 1rem; font-weight: 700; }
+  .metric-total .total-sub { font-family: 'Share Tech Mono', monospace; font-size: 0.62rem; color: var(--muted); text-align: right; margin-top: 2px; }
+  .metric-total .total-right { text-align: right; }
+  .metric-panel.dist .metric-total .total-value { color: var(--dist-color); }
+  .metric-panel.time .metric-total .total-value { color: var(--time-color); }
+  .metric-panel.fuel .metric-total .total-value { color: var(--fuel-color); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 900px) { .results-grid { grid-template-columns: 1fr; } .controls { grid-template-columns: 1fr; } }
+  @media (max-width: 600px) { header { flex-direction: column; align-items: flex-start; gap: 12px; } }
+
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-block">
+      <h1>Route<span>FINDER</span></h1>
+      <p>Multi-Criteria Shortest Path Analyzer</p>
+    </div>
+    <div class="status-bar">
+      <div><span class="dot" id="statusDot"></span><span id="statusText">AWAITING INPUT</span></div>
+      <div id="nodeCountStatus">NODES: —</div>
+      <div id="edgeCountStatus">EDGES: —</div>
+    </div>
+  </header>
+
+  <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+    <div class="upload-icon">📂</div>
+    <h3>Drop Excel File Here</h3>
+    <p>or click to browse your files</p>
+    <span class="badge">XLSX · XLS · CSV</span>
+  </div>
+
+  <div class="controls">
+    <div class="field-group">
+      <label>Graph Display Metric</label>
+      <select id="displayMetric">
+        <option value="distance">Distance</option>
+        <option value="time">Time</option>
+        <option value="fuel">Fuel</option>
+      </select>
+    </div>
+    <button class="btn" id="analyzeBtn" disabled onclick="runAnalysis()">Auto-Analyze All Nodes</button>
+  </div>
+
+  <div class="data-preview" id="dataPreview" style="display:none">
+    <div class="section-title">Loaded Edge Data</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>From</th><th>To</th><th>Distance</th><th>Time</th><th>Fuel</th></tr></thead>
+        <tbody id="edgeTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="graph-section" id="graphSection" style="display:none">
+    <div class="section-title">Network Graph</div>
+    <canvas id="graphCanvas"></canvas>
+  </div>
+
+  <div class="results-section" id="resultsSection" style="display:none">
+
+    <div class="section-title">Best Starting Node Analysis</div>
+    <div class="winner-banner">
+      <div class="winner-crown">🏆</div>
+      <div class="winner-info">
+        <div class="winner-label">Best Overall Starting Node</div>
+        <div class="winner-node" id="winnerNode">—</div>
+        <div class="winner-desc" id="winnerDesc"></div>
+      </div>
+      <div class="winner-scores" id="winnerScores"></div>
+    </div>
+
+    <div class="section-title">All Node Rankings</div>
+    <div class="ranking-table-wrap">
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>Node</th>
+            <th style="color:var(--dist-color)">Total Distance</th>
+            <th style="color:var(--time-color)">Total Time</th>
+            <th style="color:var(--fuel-color)">Total Fuel</th>
+            <th style="color:var(--gold)">Overall Score</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody"></tbody>
+      </table>
+    </div>
+
+    <div class="section-title">Optimal Routes per Metric</div>
+    <div class="results-grid">
+
+      <div class="metric-panel dist fade-in">
+        <div class="metric-header">
+          <div class="metric-icon">📏</div>
+          <div>
+            <div class="metric-name">Best start for</div>
+            <div class="metric-label">Shortest Distance</div>
+          </div>
+          <div class="best-node-tag">
+            <div class="bnt-label">Start Node</div>
+            <div class="bnt-val" id="distBestNode">—</div>
+          </div>
+        </div>
+        <div class="route-list" id="distRoutes"></div>
+        <div class="metric-total" id="distTotal" style="display:none">
+          <div class="total-label">Total Distance</div>
+          <div class="total-right">
+            <div class="total-value" id="distTotalVal">—</div>
+            <div class="total-sub" id="distTotalSub"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-panel time fade-in" style="animation-delay:0.1s">
+        <div class="metric-header">
+          <div class="metric-icon">⚡</div>
+          <div>
+            <div class="metric-name">Best start for</div>
+            <div class="metric-label">Fastest Route</div>
+          </div>
+          <div class="best-node-tag">
+            <div class="bnt-label">Start Node</div>
+            <div class="bnt-val" id="timeBestNode">—</div>
+          </div>
+        </div>
+        <div class="route-list" id="timeRoutes"></div>
+        <div class="metric-total" id="timeTotal" style="display:none">
+          <div class="total-label">Total Time</div>
+          <div class="total-right">
+            <div class="total-value" id="timeTotalVal">—</div>
+            <div class="total-sub" id="timeTotalSub"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="metric-panel fuel fade-in" style="animation-delay:0.2s">
+        <div class="metric-header">
+          <div class="metric-icon">⛽</div>
+          <div>
+            <div class="metric-name">Best start for</div>
+            <div class="metric-label">Lowest Fuel</div>
+          </div>
+          <div class="best-node-tag">
+            <div class="bnt-label">Start Node</div>
+            <div class="bnt-val" id="fuelBestNode">—</div>
+          </div>
+        </div>
+        <div class="route-list" id="fuelRoutes"></div>
+        <div class="metric-total" id="fuelTotal" style="display:none">
+          <div class="total-label">Total Fuel</div>
+          <div class="total-right">
+            <div class="total-value" id="fuelTotalVal">—</div>
+            <div class="total-sub" id="fuelTotalSub"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+<script>
+let edges = [], nodes = new Set();
+let highlightNodes = {};
+let graphPathData = {};   // { distance: {startNode, paths}, time: {...}, fuel: {...} }
+let hoveredDest = null;   // node id currently hovered in route list
+
+// ── Upload ──
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+      parseData(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 }));
+    } catch(err) { alert('Error reading file: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseData(rows) {
+  const start = (rows[0] && isNaN(Number(rows[0][0]))) ? 1 : 0;
+  edges = []; nodes = new Set();
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length < 5) continue;
+    const from = String(row[0]).trim(), to = String(row[1]).trim();
+    const dist = parseFloat(row[2]), time = parseFloat(row[3]), fuel = parseFloat(row[4]);
+    if (!from || !to || isNaN(dist) || isNaN(time) || isNaN(fuel)) continue;
+    edges.push({ from, to, distance: dist, time, fuel });
+    nodes.add(from); nodes.add(to);
+  }
+  if (!edges.length) { alert('No valid data. Expected columns: From, To, Distance, Time, Fuel'); return; }
+  updateUI();
+}
+
+function updateUI() {
+  document.getElementById('statusDot').classList.add('active');
+  document.getElementById('statusText').textContent = 'DATA LOADED';
+  document.getElementById('nodeCountStatus').textContent = `NODES: ${nodes.size}`;
+  document.getElementById('edgeCountStatus').textContent = `EDGES: ${edges.length}`;
+  dropZone.querySelector('h3').textContent = '✓ File Loaded Successfully';
+  dropZone.style.borderColor = 'var(--accent3)'; dropZone.style.borderStyle = 'solid';
+  document.getElementById('analyzeBtn').disabled = false;
+
+  const tbody = document.getElementById('edgeTableBody');
+  tbody.innerHTML = '';
+  edges.forEach((e, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${e.from}</td><td>${e.to}</td><td>${e.distance}</td><td>${e.time}</td><td>${e.fuel}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('dataPreview').style.display = 'block';
+  document.getElementById('graphSection').style.display = 'block';
+  document.getElementById('displayMetric').onchange = drawGraph;
+  drawGraph();
+}
+
+
+// ── Graph ──
+function drawGraph() {
+  const canvas = document.getElementById('graphCanvas');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth, H = 420;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const metric = document.getElementById('displayMetric').value;
+  const colorMap = { distance: '#00e5ff', time: '#ff6b35', fuel: '#7fff6b' };
+  const color = colorMap[metric];
+
+  // Grab path data for current metric
+  const pathInfo = graphPathData[metric]; // { startNode, paths }
+  const startNode = pathInfo ? pathInfo.startNode : null;
+  const paths     = pathInfo ? pathInfo.paths : {};
+
+  // Build set of active path edges: key = "A|B" in direction A→B
+  // and a set of all nodes involved in paths
+  const activeEdges = new Set(); // directed "A|B"
+  const activeNodes = new Set();
+  const focusedEdges = new Set(); // only the hovered path
+  const focusedNodes = new Set();
+
+  if (startNode) activeNodes.add(startNode);
+
+  Object.entries(paths).forEach(([dest, { path }]) => {
+    if (!path || path.length <= 1) return;
+    const isFocused = hoveredDest === dest;
+    for (let i = 0; i < path.length - 1; i++) {
+      const key = path[i] + '|' + path[i+1];
+      activeEdges.add(key);
+      activeNodes.add(path[i]);
+      activeNodes.add(path[i+1]);
+      if (isFocused) { focusedEdges.add(key); focusedNodes.add(path[i]); focusedNodes.add(path[i+1]); }
+    }
+  });
+
+  const hasFocus = hoveredDest !== null;
+
+  // Layout
+  const nodeArr = [...nodes].sort();
+  const cx = W / 2, cy = H / 2, r = Math.min(W, H) * 0.38;
+  const pos = {};
+  nodeArr.forEach((n, i) => {
+    const angle = (2 * Math.PI * i / nodeArr.length) - Math.PI / 2;
+    pos[n] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+  });
+
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Helper: arrowhead ──
+  function drawArrow(ctx, x1, y1, x2, y2, nodeRadius) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if (len < 1) return;
+    const ux = dx/len, uy = dy/len;
+    // Place arrow at 60% along the segment (avoids overlapping node)
+    const tx = x1 + dx * 0.62, ty = y1 + dy * 0.62;
+    const aLen = 9, aWid = 5;
+    ctx.beginPath();
+    ctx.moveTo(tx + ux * aLen, ty + uy * aLen);
+    ctx.lineTo(tx - ux * aLen - uy * aWid, ty - uy * aLen + ux * aWid);
+    ctx.lineTo(tx - ux * aLen + uy * aWid, ty - uy * aLen - ux * aWid);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── 1. Ghost edges (background) ──
+  edges.forEach(e => {
+    const p1 = pos[e.from], p2 = pos[e.to];
+    if (!p1 || !p2) return;
+    const edgeKey1 = e.from + '|' + e.to, edgeKey2 = e.to + '|' + e.from;
+    const isActive = activeEdges.has(edgeKey1) || activeEdges.has(edgeKey2);
+    if (!isActive) {
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = '#1e2836'; ctx.lineWidth = 1; ctx.stroke();
+    }
+  });
+
+  // ── 2. Active path edges ──
+  // Collect directed edges from paths
+  const drawnEdgePairs = new Set();
+
+  Object.entries(paths).forEach(([dest, { path }]) => {
+    if (!path || path.length <= 1) return;
+    const isFocused = hoveredDest === dest;
+    const dimmed = hasFocus && !isFocused;
+
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i+1];
+      const p1 = pos[a], p2 = pos[b];
+      if (!p1 || !p2) continue;
+
+      const alpha = dimmed ? 0.15 : (isFocused ? 1.0 : 0.55);
+      const lw    = dimmed ? 1 : (isFocused ? 3 : 1.8);
+
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+      ctx.strokeStyle = color + Math.round(alpha * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth = lw;
+      ctx.stroke();
+
+      // Arrowhead
+      ctx.fillStyle = color + Math.round(alpha * 255).toString(16).padStart(2,'0');
+      drawArrow(ctx, p1.x, p1.y, p2.x, p2.y, 11);
+
+      // Edge weight label (only on active, not dimmed)
+      if (!dimmed) {
+        const pairKey = [a,b].sort().join('-');
+        if (!drawnEdgePairs.has(pairKey)) {
+          drawnEdgePairs.add(pairKey);
+          const edgeData = edges.find(e => (e.from===a && e.to===b) || (e.from===b && e.to===a));
+          if (edgeData) {
+            const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+            const labelAlpha = isFocused ? 1.0 : 0.75;
+            // Small pill background
+            ctx.font = 'bold 10px Share Tech Mono, monospace';
+            const label = String(edgeData[metric]);
+            const tw = ctx.measureText(label).width;
+            ctx.fillStyle = '#0a0c10cc';
+            ctx.beginPath();
+            ctx.roundRect(mx - tw/2 - 4, my - 8, tw + 8, 16, 3);
+            ctx.fill();
+            ctx.fillStyle = color + Math.round(labelAlpha * 255).toString(16).padStart(2,'0');
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(label, mx, my);
+          }
+        }
+      }
+    }
+  });
+
+  // ── 3. Nodes ──
+  nodeArr.forEach(n => {
+    const { x, y } = pos[n];
+    const isStart = n === startNode;
+    const isInPath = activeNodes.has(n);
+    const isFocusedNode = hasFocus ? focusedNodes.has(n) : isInPath;
+    const isDimmed = hasFocus && !focusedNodes.has(n) && !isStart;
+    const isDestination = !isStart && isInPath;
+
+    // Glow
+    if (isStart && !isDimmed) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 28);
+      g.addColorStop(0, '#ffd16650'); g.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(x, y, 28, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    } else if (isFocusedNode && !isStart && !isDimmed) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 20);
+      g.addColorStop(0, color + '33'); g.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(x, y, 20, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    }
+
+    const nodeAlpha = isDimmed ? 0.25 : 1;
+    const rad = isStart ? 16 : (isInPath ? 13 : 10);
+    const fillColor = isStart ? '#ffd166' : (isFocusedNode && !isDimmed ? color : '#141920');
+    const strokeColor = isStart ? '#ffd166' : (isInPath && !isDimmed ? color : '#2a3a4a');
+
+    ctx.globalAlpha = nodeAlpha;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = isStart || (isInPath && !isDimmed) ? 2 : 1;
+    ctx.fill(); ctx.stroke();
+
+    ctx.font = `${isStart || (isFocusedNode && !isDimmed) ? 'bold ' : ''}12px Barlow, sans-serif`;
+    ctx.fillStyle = (isStart || (isFocusedNode && !isDimmed)) && !isDimmed ? (isStart ? '#000' : '#000') : '#8899aa';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n, x, y);
+    ctx.globalAlpha = 1;
+
+    // "START" label under start node
+    if (isStart) {
+      ctx.font = 'bold 9px Share Tech Mono, monospace';
+      ctx.fillStyle = '#ffd166bb';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText('START', x, y + rad + 4);
+    }
+  });
+
+  // ── 4. Legend ──
+  const legendItems = [
+    { c: '#ffd166', shape: 'circle', l: `Start Node${startNode ? ` (Node ${startNode})` : ''}` },
+    { c: color,     shape: 'line',   l: `Optimal paths (${metric})` },
+  ];
+  if (hasFocus) legendItems.push({ c: color, shape: 'bright', l: `Highlighted: Node ${hoveredDest}` });
+
+  legendItems.forEach(({ c, shape, l }, i) => {
+    const ly = H - 18 - i * 20;
+    if (shape === 'circle') {
+      ctx.beginPath(); ctx.arc(16, ly, 5, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
+    } else if (shape === 'line') {
+      ctx.beginPath(); ctx.moveTo(8, ly); ctx.lineTo(24, ly);
+      ctx.strokeStyle = c + 'aa'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = c + 'aa'; drawArrow(ctx, 8, ly, 24, ly, 0);
+    } else {
+      ctx.beginPath(); ctx.moveTo(8, ly); ctx.lineTo(24, ly);
+      ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.stroke();
+    }
+    ctx.font = '11px Barlow, sans-serif'; ctx.fillStyle = '#c8d8e8cc';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(l, 32, ly);
+  });
+}
+
+window.addEventListener('resize', () => { if (edges.length) drawGraph(); });
+
+// ── Dijkstra ──
+function dijkstra(startNode, weightKey) {
+  const dist = {}, prev = {}, visited = new Set(), nodeArr = [...nodes];
+  nodeArr.forEach(n => { dist[n] = Infinity; prev[n] = null; });
+  dist[startNode] = 0;
+  const adj = {};
+  nodeArr.forEach(n => adj[n] = []);
+  edges.forEach(e => {
+    adj[e.from].push({ node: e.to, weight: e[weightKey] });
+    adj[e.to].push({ node: e.from, weight: e[weightKey] });
+  });
+  while (true) {
+    let u = null;
+    nodeArr.forEach(n => { if (!visited.has(n) && (u === null || dist[n] < dist[u])) u = n; });
+    if (u === null || dist[u] === Infinity) break;
+    visited.add(u);
+    adj[u].forEach(({ node: v, weight }) => { const alt = dist[u] + weight; if (alt < dist[v]) { dist[v] = alt; prev[v] = u; } });
+  }
+  const paths = {};
+  nodeArr.forEach(n => {
+    if (n === startNode) return;
+    const path = []; let cur = n;
+    while (cur !== null) { path.unshift(cur); cur = prev[cur]; }
+    paths[n] = { path, cost: dist[n] };
+  });
+  return paths;
+}
+
+// ── All simple paths (for alternatives) ──
+function allPaths(startNode, endNode, weightKey) {
+  const adj = {};
+  [...nodes].forEach(n => adj[n] = []);
+  edges.forEach(e => {
+    adj[e.from].push({ node: e.to, weight: e[weightKey] });
+    adj[e.to].push({ node: e.from, weight: e[weightKey] });
+  });
+  const results = [];
+  const queue = [{ node: startNode, path: [startNode], cost: 0, visited: new Set([startNode]) }];
+  while (queue.length) {
+    const { node, path, cost, visited } = queue.shift();
+    if (node === endNode && path.length > 1) { results.push({ path: [...path], cost }); continue; }
+    adj[node].forEach(({ node: next, weight }) => {
+      if (!visited.has(next)) {
+        const nv = new Set(visited); nv.add(next);
+        queue.push({ node: next, path: [...path, next], cost: cost + weight, visited: nv });
+      }
+    });
+    if (results.length > 100) break;
+  }
+  return results.sort((a, b) => a.cost - b.cost);
+}
+
+// ── Find best starting node ──
+function findBestNode(weightKey) {
+  let bestNode = null, bestTotal = Infinity;
+  const allResults = {};
+  [...nodes].sort().forEach(n => {
+    const paths = dijkstra(n, weightKey);
+    const total = Object.values(paths).reduce((s, p) => s + (isFinite(p.cost) ? p.cost : 0), 0);
+    allResults[n] = { paths, total };
+    if (total < bestTotal) { bestTotal = total; bestNode = n; }
+  });
+  return { bestNode, bestTotal, allResults };
+}
+
+// ── Render routes ──
+function renderRoutes(containerId, paths, metricKey, unit, startNode) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  const sorted = Object.keys(paths).sort();
+  if (!sorted.length) { container.innerHTML = '<div class="no-data">NO ROUTES COMPUTED</div>'; return; }
+
+  let totalCost = 0, reachableCount = 0;
+  sorted.forEach(dest => {
+    const { path, cost } = paths[dest];
+    const item = document.createElement('div');
+    item.className = 'route-item';
+    if (path.length <= 1 || !isFinite(cost)) {
+      item.innerHTML = `<div class="route-dest"><span class="dest-name">→ Node ${dest}</span><span class="dest-value">∞</span></div><div class="route-path"><span style="color:var(--muted)">No path found</span></div>`;
+      container.appendChild(item); return;
+    }
+    totalCost += cost; reachableCount++;
+    const alts = allPaths(startNode, dest, metricKey);
+    const pathHtml = path.map(n => `<span class="node-chip">${n}</span>`).join('<span class="arrow"> → </span>');
+    const altId = `alt-${containerId}-${dest}`;
+    const others = alts.filter(a => a.path.join() !== path.join()).slice(0, 4);
+    const altRows = others.map(a => {
+      const ap = a.path.map(n => `<span class="node-chip">${n}</span>`).join('<span class="arrow"> → </span>');
+      return `<div class="alt-path-row"><div class="route-path">${ap}</div><span style="margin-left:8px">${+a.cost.toFixed(2)} ${unit}</span></div>`;
+    }).join('');
+    item.innerHTML = `
+      <div class="route-dest"><span class="dest-name">→ Node ${dest}</span><span class="dest-value">${+cost.toFixed(2)} ${unit}</span></div>
+      <div class="route-path">${pathHtml}</div>
+      ${others.length ? `<span class="alt-toggle" onclick="toggleAlt('${altId}')">▸ ${others.length} alternative route${others.length>1?'s':''}</span><div class="alt-paths" id="${altId}">${altRows}</div>` : ''}`;
+    item.addEventListener('mouseenter', () => {
+      hoveredDest = dest;
+      document.getElementById('displayMetric').value = metricKey;
+      drawGraph();
+    });
+    item.addEventListener('mouseleave', () => {
+      hoveredDest = null;
+      drawGraph();
+    });
+    container.appendChild(item);
+  });
+
+  const tp = document.getElementById(containerId.replace('Routes','Total'));
+  if (tp && reachableCount > 0) {
+    document.getElementById(containerId.replace('Routes','TotalVal')).textContent = `${+totalCost.toFixed(2)} ${unit}`;
+    document.getElementById(containerId.replace('Routes','TotalSub')).textContent = `avg ${+(totalCost/reachableCount).toFixed(2)} ${unit} · ${reachableCount} routes`;
+    tp.style.display = 'flex';
+  }
+}
+
+function toggleAlt(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  el.previousElementSibling.textContent = el.previousElementSibling.textContent
+    .replace(el.classList.contains('open') ? '▸' : '▾', el.classList.contains('open') ? '▾' : '▸');
+}
+
+// ── Main ──
+function runAnalysis() {
+  const nodeArr = [...nodes].sort();
+  const distResult = findBestNode('distance');
+  const timeResult = findBestNode('time');
+  const fuelResult = findBestNode('fuel');
+
+  // Build per-node stats
+  const nodeStats = {};
+  nodeArr.forEach(n => {
+    nodeStats[n] = {
+      dist: distResult.allResults[n].total,
+      time: timeResult.allResults[n].total,
+      fuel: fuelResult.allResults[n].total,
+    };
+  });
+
+  // Normalize and compute overall score (0 = best)
+  const vals = m => nodeArr.map(n => nodeStats[n][m]);
+  const norm = (v, arr) => { const mn = Math.min(...arr), mx = Math.max(...arr); return mx===mn ? 0 : (v-mn)/(mx-mn); };
+  nodeArr.forEach(n => {
+    nodeStats[n].score = norm(nodeStats[n].dist, vals('dist'))
+                       + norm(nodeStats[n].time, vals('time'))
+                       + norm(nodeStats[n].fuel, vals('fuel'));
+  });
+
+  let overallBest = nodeArr[0];
+  nodeArr.forEach(n => { if (nodeStats[n].score < nodeStats[overallBest].score) overallBest = n; });
+
+  highlightNodes = { distance: distResult.bestNode, time: timeResult.bestNode, fuel: fuelResult.bestNode, overall: overallBest };
+
+  // Store path data for graph visualization
+  graphPathData = {
+    distance: { startNode: distResult.bestNode, paths: distResult.allResults[distResult.bestNode].paths },
+    time:     { startNode: timeResult.bestNode, paths: timeResult.allResults[timeResult.bestNode].paths },
+    fuel:     { startNode: fuelResult.bestNode, paths: fuelResult.allResults[fuelResult.bestNode].paths },
+  };
+
+  // Winner banner
+  const ob = nodeStats[overallBest];
+  document.getElementById('winnerNode').textContent = `Node ${overallBest}`;
+  document.getElementById('winnerDesc').textContent = `Lowest combined normalized score across all three metrics (score: ${+ob.score.toFixed(3)})`;
+  document.getElementById('winnerScores').innerHTML = `
+    <div class="winner-score-item dist"><div class="ws-label">Total Distance</div><div class="ws-val">${+ob.dist.toFixed(2)} km</div></div>
+    <div class="winner-score-item time"><div class="ws-label">Total Time</div><div class="ws-val">${+ob.time.toFixed(2)} min</div></div>
+    <div class="winner-score-item fuel"><div class="ws-label">Total Fuel</div><div class="ws-val">${+ob.fuel.toFixed(2)} L</div></div>`;
+
+  // Ranking table
+  const ranked = [...nodeArr].sort((a, b) => nodeStats[a].score - nodeStats[b].score);
+  const rankBody = document.getElementById('rankingBody');
+  rankBody.innerHTML = '';
+  ranked.forEach((n, i) => {
+    const rc = i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+    const isDist = n===distResult.bestNode, isTime = n===timeResult.bestNode, isFuel = n===fuelResult.bestNode, isOver = n===overallBest;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="rank-badge ${rc}">${i+1}</span>Node ${n}${isOver?' <span class="crown-tag">🏆</span>':''}</td>
+      <td class="${isDist?'best-cell dist':''}">${+nodeStats[n].dist.toFixed(2)} km${isDist?' ★':''}</td>
+      <td class="${isTime?'best-cell time':''}">${+nodeStats[n].time.toFixed(2)} min${isTime?' ★':''}</td>
+      <td class="${isFuel?'best-cell fuel':''}">${+nodeStats[n].fuel.toFixed(2)} L${isFuel?' ★':''}</td>
+      <td class="${isOver?'best-cell overall':''}">${+nodeStats[n].score.toFixed(3)}${isOver?' ★':''}</td>`;
+    rankBody.appendChild(tr);
+  });
+
+  // Route panels
+  document.getElementById('distBestNode').textContent = `Node ${distResult.bestNode}`;
+  document.getElementById('timeBestNode').textContent = `Node ${timeResult.bestNode}`;
+  document.getElementById('fuelBestNode').textContent = `Node ${fuelResult.bestNode}`;
+  renderRoutes('distRoutes', distResult.allResults[distResult.bestNode].paths, 'distance', 'km', distResult.bestNode);
+  renderRoutes('timeRoutes', timeResult.allResults[timeResult.bestNode].paths, 'time', 'min', timeResult.bestNode);
+  renderRoutes('fuelRoutes', fuelResult.allResults[fuelResult.bestNode].paths, 'fuel', 'L', fuelResult.bestNode);
+
+  document.getElementById('resultsSection').style.display = 'block';
+  document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  drawGraph();
+}
+</script>
+</body>
+</html>
