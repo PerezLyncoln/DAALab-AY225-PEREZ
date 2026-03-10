@@ -651,24 +651,36 @@ function dijkstra(startNode, weightKey) {
 
 // ── All simple paths (for alternatives) ──
 function allPaths(startNode, endNode, weightKey) {
+  // Build adjacency with deduplication — avoid adding the same neighbor twice
   const adj = {};
-  [...nodes].forEach(n => adj[n] = []);
+  [...nodes].forEach(n => adj[n] = new Map());
   edges.forEach(e => {
-    adj[e.from].push({ node: e.to, weight: e[weightKey] });
-    adj[e.to].push({ node: e.from, weight: e[weightKey] });
+    // Use Map keyed by neighbor so duplicates overwrite (last wins, doesn't matter — just no repeats)
+    adj[e.from].set(e.to, e[weightKey]);
+    adj[e.to].set(e.from, e[weightKey]);
   });
+
+  const seenPaths = new Set(); // deduplicate by path signature
   const results = [];
   const queue = [{ node: startNode, path: [startNode], cost: 0, visited: new Set([startNode]) }];
+
   while (queue.length) {
     const { node, path, cost, visited } = queue.shift();
-    if (node === endNode && path.length > 1) { results.push({ path: [...path], cost }); continue; }
-    adj[node].forEach(({ node: next, weight }) => {
+    if (node === endNode && path.length > 1) {
+      const sig = path.join(',');
+      if (!seenPaths.has(sig)) {
+        seenPaths.add(sig);
+        results.push({ path: [...path], cost });
+      }
+      continue;
+    }
+    adj[node].forEach((weight, next) => {
       if (!visited.has(next)) {
         const nv = new Set(visited); nv.add(next);
         queue.push({ node: next, path: [...path, next], cost: cost + weight, visited: nv });
       }
     });
-    if (results.length > 100) break;
+    if (results.length > 50) break;
   }
   return results.sort((a, b) => a.cost - b.cost);
 }
@@ -706,7 +718,14 @@ function renderRoutes(containerId, paths, metricKey, unit, startNode) {
     const alts = allPaths(startNode, dest, metricKey);
     const pathHtml = path.map(n => `<span class="node-chip">${n}</span>`).join('<span class="arrow"> → </span>');
     const altId = `alt-${containerId}-${dest}`;
-    const others = alts.filter(a => a.path.join() !== path.join()).slice(0, 4);
+    const optimalSig = path.join(',');
+    const seenSigs = new Set([optimalSig]);
+    const others = [];
+    for (const a of alts) {
+      const sig = a.path.join(',');
+      if (!seenSigs.has(sig)) { seenSigs.add(sig); others.push(a); }
+      if (others.length >= 4) break;
+    }
     const altRows = others.map(a => {
       const ap = a.path.map(n => `<span class="node-chip">${n}</span>`).join('<span class="arrow"> → </span>');
       return `<div class="alt-path-row"><div class="route-path">${ap}</div><span style="margin-left:8px">${+a.cost.toFixed(2)} ${unit}</span></div>`;
