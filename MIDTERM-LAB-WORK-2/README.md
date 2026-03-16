@@ -35,7 +35,7 @@ No server, no installation, no dependencies to install. Everything runs locally 
 
 ## Getting Started
 
-1. Open `MidtermLab1-PEREZ-v2.html` in any modern web browser (Chrome, Firefox, Edge, Safari).
+1. Open `MidtermLab2-PEREZ.html` in any modern web browser (Chrome, Firefox, Edge, Safari).
 2. Click the upload zone or drag-and-drop your `.xlsx`, `.xls`, or `.csv` file.
 3. The graph renders immediately. Use the toolbar and controls to explore.
 
@@ -227,7 +227,3 @@ MidtermLab1-PEREZ-v2.html
 - **Dense graphs** — the all-paths BFS caps at 80 results; very large or dense graphs may not enumerate all alternatives.
 - **CDN dependency** — the XLSX parsing library requires an internet connection on first load.
 - **No touch support** — canvas interactions (hover, click) are mouse-only; touch/mobile devices are not fully supported.
-
----
-
-*Developed as part of MidtermLab1 · BSIT — Data Structures & Algorithms*
