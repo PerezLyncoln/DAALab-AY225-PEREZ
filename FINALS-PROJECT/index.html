@@ -187,6 +187,91 @@
       }
     }
 
+    /**
+     * switchDataset(type) - Switch between combined, train, and test arrhythmia data
+     */
+    function switchDataset(type) {
+      currentArrhythmiaView = type;
+      let dataToDisplay;
+
+      if (type === 'combined') {
+        dataToDisplay = arrhythmiaCombinedData;
+      } else if (type === 'train') {
+        dataToDisplay = arrhythmiaTrainData;
+      } else if (type === 'test') {
+        dataToDisplay = arrhythmiaTestData;
+      }
+
+      // Update button states
+      document.querySelectorAll('.dataset-btn').forEach(btn => {
+        btn.classList.remove('active', 'bg-blue-500');
+        btn.classList.add('bg-gray-500');
+      });
+      event.target.classList.add('active', 'bg-blue-500');
+      event.target.classList.remove('bg-gray-500');
+
+      // Re-render table and summaries
+      renderArrhythmiaTable(dataToDisplay);
+      updateArrhythmiaSummary(dataToDisplay);
+    }
+    
+    /**
+     * renderECGTable(data) - Populates ECG table with data
+     */
+    function renderECGTable(data) {
+      const tbody = document.querySelector('#ecgTable tbody');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:20px;">No data found.</td></tr>';
+        return;
+      }
+
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="p-2">${row.id}</td>
+          <td class="p-2">
+            <span class="px-2 py-1 rounded ${row.status === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+              ${row.status}
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /**
+     * renderArrhythmiaTable(data) - Populates Arrhythmia table with data
+     */
+    function renderArrhythmiaTable(data) {
+      const tbody = document.querySelector('#arrTable tbody');
+      tbody.innerHTML = '';
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No data found.</td></tr>';
+        return;
+      }
+
+      const classLabels = { 0: 'N (Normal)', 1: 'S (Supraventricular)', 2: 'V (Ventricular)', 3: 'F (Fusion)', 4: 'Q (Unknown)' };
+
+      data.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b hover:bg-gray-50';
+        tr.innerHTML = `
+          <td class="p-2">${row.id}</td>
+          <td class="p-2">
+            <span class="px-2 py-1 rounded text-xs ${row.dataset === 'Training' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}">
+              ${row.dataset}
+            </span>
+          </td>
+          <td class="p-2">${row.class} (${classLabels[row.class] || 'Unknown'})</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', loadDataset);
   </script>
