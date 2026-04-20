@@ -170,6 +170,25 @@
         return row.split(',').map(cell => cell.trim());
       });
     }
+
+    /**
+     * showSection(sectionName) - Toggles between ECG and Arrhythmia sections
+     */
+    function showSection(sectionName) {
+      const ecgSection = document.getElementById('ecgSection');
+      const arrhythmiaSection = document.getElementById('arrhythmiaSection');
+
+      if (sectionName === 'ecg') {
+        ecgSection.classList.remove('hidden');
+        arrhythmiaSection.classList.add('hidden');
+      } else if (sectionName === 'arrhythmia') {
+        ecgSection.classList.add('hidden');
+        arrhythmiaSection.classList.remove('hidden');
+      }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', loadDataset);
   </script>
 
 </body>
