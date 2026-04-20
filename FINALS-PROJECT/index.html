@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ECG & Arrhythmia Analysis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+
+  <div class="max-w-6xl mx-auto">
+    <!-- Toggle Buttons -->
+    <div class="flex gap-4 mb-6">
+      <button onclick="showSection('ecg')" class="px-4 py-2 bg-blue-500 text-white rounded">ECG Analysis</button>
+      <button onclick="showSection('arrhythmia')" class="px-4 py-2 bg-green-500 text-white rounded">Arrhythmia Analysis</button>
+    </div>
+
+    <!-- ECG Section -->
+    <div id="ecgSection">
+      <h2 class="text-xl font-bold mb-4">ECG Analysis</h2>
+
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-4 rounded shadow">Total Cases: <span id="ecgTotal">0</span></div>
+        <div class="bg-white p-4 rounded shadow">Normal Cases: <span id="ecgNormal">0</span></div>
+        <div class="bg-white p-4 rounded shadow">Abnormal Cases: <span id="ecgAbnormal">0</span></div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex gap-2 mb-4">
+        <select id="ecgSort" onchange="sortTable('ecgTable', this.value)" class="p-2 border">
+          <option value="">Sort By</option>
+          <option value="0">ID</option>
+          <option value="1">Status</option>
+        </select>
+        <button onclick="resetTable('ecgTable')" class="px-3 py-2 bg-gray-500 text-white rounded">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <table class="w-full bg-white" id="ecgTable">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID</th>
+            <th class="p-2">Status</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <!-- Arrhythmia Section -->
+    <div id="arrhythmiaSection" class="hidden">
+      <h2 class="text-xl font-bold mb-4">Arrhythmia Analysis</h2>
+
+      <!-- Dataset Toggle -->
+      <div class="flex gap-2 mb-4 bg-white p-3 rounded">
+        <button onclick="switchDataset('combined')" class="px-3 py-2 bg-blue-500 text-white rounded dataset-btn active">Combined (Train + Test)</button>
+        <button onclick="switchDataset('train')" class="px-3 py-2 bg-gray-500 text-white rounded dataset-btn">Training Set</button>
+        <button onclick="switchDataset('test')" class="px-3 py-2 bg-gray-500 text-white rounded dataset-btn">Test Set</button>
+      </div>
+
+      <!-- Summary Cards -->
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-4 rounded shadow">Total Cases: <span id="arrTotal">0</span></div>
+        <div class="bg-white p-4 rounded shadow col-span-2">
+          <div>Classifications:</div>
+          <div class="text-sm mt-2">
+            0 (N): <span id="c0">0</span> |
+            1 (S): <span id="c1">0</span> |
+            2 (V): <span id="c2">0</span> |
+            3 (F): <span id="c3">0</span> |
+            4 (Q): <span id="c4">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex gap-2 mb-4">
+        <select onchange="sortTable('arrTable', this.value)" class="p-2 border">
+          <option value="">Sort By</option>
+          <option value="0">ID</option>
+          <option value="1">Class</option>
+        </select>
+        <button onclick="resetTable('arrTable')" class="px-3 py-2 bg-gray-500 text-white rounded">Reset</button>
+      </div>
+
+      <!-- Table -->
+      <table class="w-full bg-white" id="arrTable">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID</th>
+            <th class="p-2">Dataset</th>
+            <th class="p-2">Class</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+  </script>
+
+</body>
+</html>
