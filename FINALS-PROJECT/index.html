@@ -99,6 +99,77 @@
   </div>
 
   <script>
+    // Global data storage
+    let ecgData = [];
+    let arrhythmiaTrainData = [];
+    let arrhythmiaTestData = [];
+    let arrhythmiaCombinedData = [];
+    let currentArrhythmiaView = 'combined';
+
+    /**
+     * loadDataset() - Entry point for loading all datasets
+     * Loads all datasets from CSV files
+     */
+    async function loadDataset() {
+      try {
+        // Load ECG data (normal + abnormal)
+        const normalECG = await loadCSV('archive/ptbdb_normal.csv');
+        const abnormalECG = await loadCSV('archive/ptbdb_abnormal.csv');
+
+        ecgData = normalECG.map((row, i) => ({
+          id: i + 1,
+          status: 'Normal'
+        })).concat(
+          abnormalECG.map((row, i) => ({
+            id: normalECG.length + i + 1,
+            status: 'Abnormal'
+          }))
+        );
+
+        // Load Arrhythmia training data
+        const trainRecords = await loadCSV('archive/mitbih_train.csv');
+        arrhythmiaTrainData = trainRecords.map((row, i) => ({
+          id: i + 1,
+          dataset: 'Training',
+          class: parseInt(row[row.length - 1]) // Last column is the class
+        }));
+
+        // Load Arrhythmia test data
+        const testRecords = await loadCSV('archive/mitbih_test.csv');
+        arrhythmiaTestData = testRecords.map((row, i) => ({
+          id: i + 1,
+          dataset: 'Test',
+          class: parseInt(row[row.length - 1]) // Last column is the class
+        }));
+
+        // Combine both datasets
+        arrhythmiaCombinedData = [...arrhythmiaTrainData, ...arrhythmiaTestData];
+
+        // Render tables and summaries
+        renderECGTable(ecgData);
+        updateECGSummary(ecgData);
+        renderArrhythmiaTable(arrhythmiaCombinedData);
+        updateArrhythmiaSummary(arrhythmiaCombinedData);
+      } catch (error) {
+        console.error('Error loading datasets:', error);
+      }
+    }
+
+    /**
+     * loadCSV(filePath) - Parses a CSV file into a 2D array
+     * @param {string} filePath - Path to the CSV file
+     * @returns {Promise<Array[]>} 2D array of CSV data
+     */
+    async function loadCSV(filePath) {
+      const response = await fetch(filePath);
+      const text = await response.text();
+      const rows = text.trim().split('\n');
+
+      return rows.map(row => {
+        // Simple CSV parsing (handles comma-separated values)
+        return row.split(',').map(cell => cell.trim());
+      });
+    }
   </script>
 
 </body>
