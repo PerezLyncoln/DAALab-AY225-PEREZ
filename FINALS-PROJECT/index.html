@@ -3,108 +3,476 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ECG & Arrhythmia Analysis</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>CardioAnalysis — ECG & Arrhythmia Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #F4F5F7;
+      --surface:     #FFFFFF;
+      --border:      #E2E5EA;
+      --text:        #1A1D23;
+      --muted:       #6B7280;
+      --accent:      #0A5B96;
+      --accent-lt:   #EBF4FD;
+      --normal:      #0D7A5F;
+      --normal-lt:   #E8F7F3;
+      --abnormal:    #B91C1C;
+      --abnormal-lt: #FEF2F2;
+      --warn:        #92400E;
+      --warn-lt:     #FEF3C7;
+      --purple:      #5B21B6;
+      --purple-lt:   #EDE9FE;
+      --pink:        #9D174D;
+      --pink-lt:     #FDF2F8;
+      --radius:      6px;
+      --shadow:      0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* HEADER */
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .app-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+    }
+    .logo-icon {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon svg { width: 17px; height: 17px; }
+    .header-meta { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.6px; }
+
+    /* NAV TABS */
+    .nav-tabs {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+    }
+    .nav-tab {
+      padding: 14px 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .nav-tab:hover { color: var(--text); }
+    .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-pip { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+
+    /* LAYOUT */
+    .page { max-width: 1100px; margin: 0 auto; padding: 28px 32px 56px; }
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* SECTION HEADER */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; }
+    .section-sub { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    /* STAT CARDS */
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow);
+    }
+    .stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: -1.5px;
+    }
+    .stat-card.s-normal .stat-value   { color: var(--normal); }
+    .stat-card.s-abnormal .stat-value { color: var(--abnormal); }
+
+    /* Arrhythmia class pills */
+    .arr-classes { grid-column: 2 / 4; }
+    .class-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .class-pill {
+      display: flex; flex-direction: column;
+      padding: 10px 14px;
+      border-radius: 5px;
+      flex: 1; min-width: 70px;
+    }
+    .class-pill-label { font-size: 10px; font-weight: 600; opacity: 0.65; margin-bottom: 4px; letter-spacing: 0.3px; }
+    .class-pill-val   { font-size: 18px; font-weight: 600; font-family: 'DM Mono', monospace; }
+    .pill-n { background: var(--accent-lt);  color: var(--accent); }
+    .pill-s { background: var(--purple-lt);  color: var(--purple); }
+    .pill-v { background: var(--warn-lt);    color: var(--warn); }
+    .pill-f { background: var(--pink-lt);    color: var(--pink); }
+    .pill-q { background: #F3F4F6;           color: #374151; }
+
+    /* DATASET TOGGLE */
+    .dataset-toggle {
+      display: inline-flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 3px;
+      gap: 2px;
+      margin-bottom: 20px;
+    }
+    .ds-btn {
+      padding: 7px 18px;
+      font-size: 12px;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .ds-btn:hover { color: var(--text); }
+    .ds-btn.active { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+    /* FILTER BAR */
+    .filter-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      box-shadow: var(--shadow);
+    }
+    .filter-group  { display: flex; align-items: center; gap: 8px; }
+    .filter-label  { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap; }
+    .filter-select {
+      height: 31px;
+      padding: 0 10px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.15s;
+      min-width: 130px;
+    }
+    .filter-select:focus { border-color: var(--accent); }
+    .filter-divider { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+    .reset-btn {
+      height: 31px;
+      padding: 0 13px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .reset-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-lt); }
+    .filter-count { margin-left: auto; font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+
+    /* TABLE */
+    .table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 16px;
+      text-align: left;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #FAFBFC; }
+    tbody td { padding: 10px 16px; font-size: 13px; }
+    .mono-id { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+    .empty-row td { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+    /* BADGES */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .badge::before { content:''; width:5px; height:5px; border-radius:50%; background:currentColor; opacity:0.65; }
+    .badge-normal   { background: var(--normal-lt);   color: var(--normal); }
+    .badge-abnormal { background: var(--abnormal-lt); color: var(--abnormal); }
+    .badge-train    { background: var(--accent-lt);   color: var(--accent); }
+    .badge-test     { background: var(--warn-lt);     color: var(--warn); }
+    .badge-n { background: var(--accent-lt);  color: var(--accent); }
+    .badge-s { background: var(--purple-lt);  color: var(--purple); }
+    .badge-v { background: var(--warn-lt);    color: var(--warn); }
+    .badge-f { background: var(--pink-lt);    color: var(--pink); }
+    .badge-q { background: #F3F4F6;           color: #374151; }
+
+    /* VIZ */
+    .viz-ds-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 22px; flex-wrap: wrap; }
+    .viz-ds-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-right: 4px; }
+    .viz-ds-btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.15s;
+    }
+    .viz-ds-btn:hover { color: var(--text); border-color: #C5CBD5; }
+    .viz-ds-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    @media (max-width: 720px) { .chart-grid { grid-template-columns: 1fr; } .stat-grid { grid-template-columns: 1fr 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title::before { content:''; width:3px; height:14px; background:var(--accent); border-radius:2px; }
+
+    .stats-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .stats-table thead th {
+      background: var(--bg); padding:9px 14px; text-align:left;
+      font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:0.8px; color:var(--muted); border-bottom:1px solid var(--border);
+    }
+    .stats-table tbody tr { border-bottom:1px solid var(--border); }
+    .stats-table tbody tr:last-child { border-bottom:none; }
+    .stats-table tbody tr:nth-child(even) { background:#FAFBFC; }
+    .stats-table tbody td { padding:9px 14px; }
+    .stats-val  { font-family:'DM Mono',monospace; color:var(--accent); font-size:12px; }
+    .stats-desc { color:var(--muted); font-size:11px; }
+
+    .insights-box { font-size:13px; color:#374151; line-height:1.75; }
+    .insights-box p { margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+    .insights-box p:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
+    .insights-box strong { color:var(--text); font-weight:600; }
+
+    .donut-legend { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+    .donut-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+    .donut-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.35} }
+  </style>
 </head>
-<body class="bg-gray-100 p-6">
+<body>
 
-  <div class="max-w-6xl mx-auto">
-    <!-- Toggle Buttons -->
-    <div class="flex gap-4 mb-6 flex-wrap">
-      <button onclick="showSection('ecg')" class="px-4 py-2 bg-blue-500 text-white rounded">ECG Analysis</button>
-      <button onclick="showSection('arrhythmia')" class="px-4 py-2 bg-green-500 text-white rounded">Arrhythmia Analysis</button>
-      <button onclick="showSection('viz')" class="px-4 py-2 bg-purple-600 text-white rounded">Visualizations &amp; Deep Analysis</button>
+  <header class="app-header">
+    <div class="app-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1 8h2.5l2-5 2 10 2-7 1.5 4H15" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      CardioAnalysis
     </div>
+    <div class="header-meta">ECG &amp; ARRHYTHMIA DASHBOARD</div>
+  </header>
 
-    <!-- ECG Section -->
-    <div id="ecgSection">
-      <h2 class="text-xl font-bold mb-4">ECG Analysis</h2>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" onclick="showSection('ecg', this)">
+      <span class="tab-pip"></span>ECG Analysis
+    </button>
+    <button class="nav-tab" onclick="showSection('arrhythmia', this)">
+      <span class="tab-pip"></span>Arrhythmia Analysis
+    </button>
+    <button class="nav-tab" onclick="showSection('viz', this)">
+      <span class="tab-pip"></span>Visualizations &amp; Deep Analysis
+    </button>
+  </nav>
 
-      <!-- Summary Cards -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="bg-white p-4 rounded shadow">Total Cases: <span id="ecgTotal">0</span></div>
-        <div class="bg-white p-4 rounded shadow">Normal Cases: <span id="ecgNormal">0</span></div>
-        <div class="bg-white p-4 rounded shadow">Abnormal Cases: <span id="ecgAbnormal">0</span></div>
+  <div class="page">
+
+    <!-- ECG SECTION -->
+    <div id="ecgSection" class="section active">
+      <div class="section-header">
+        <span class="section-title">PTB ECG Dataset</span>
+        <span class="section-sub">ptbdb_normal.csv · ptbdb_abnormal.csv</span>
       </div>
 
-      <!-- Controls -->
-      <div class="flex gap-2 mb-4 flex-wrap items-center bg-white p-3 rounded shadow">
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">ID Range:</label>
-          <select id="ecgIdRange" onchange="applyECGFilters()" class="p-2 border rounded text-sm">
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Records</div>
+          <div class="stat-value" id="ecgTotal">—</div>
+        </div>
+        <div class="stat-card s-normal">
+          <div class="stat-label">Normal</div>
+          <div class="stat-value" id="ecgNormal">—</div>
+        </div>
+        <div class="stat-card s-abnormal">
+          <div class="stat-label">Abnormal</div>
+          <div class="stat-value" id="ecgAbnormal">—</div>
+        </div>
+      </div>
+
+      <div class="filter-bar">
+        <div class="filter-group">
+          <span class="filter-label">ID Range</span>
+          <select id="ecgIdRange" class="filter-select" onchange="applyECGFilters()">
             <option value="all">All IDs</option>
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">Status:</label>
-          <select id="ecgStatusFilter" onchange="applyECGFilters()" class="p-2 border rounded text-sm">
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">Status</span>
+          <select id="ecgStatusFilter" class="filter-select" onchange="applyECGFilters()">
             <option value="all">All</option>
             <option value="Normal">Normal</option>
             <option value="Abnormal">Abnormal</option>
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">Sort:</label>
-          <select id="ecgSort" onchange="applyECGFilters()" class="p-2 border rounded text-sm">
-            <option value="">None</option>
-            <option value="id">ID</option>
-            <option value="status">Status</option>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">Sort</span>
+          <select id="ecgSort" class="filter-select" onchange="applyECGFilters()">
+            <option value="">Default</option>
+            <option value="id">By ID</option>
+            <option value="status">By Status</option>
           </select>
         </div>
-        <button onclick="resetECGFilters()" class="px-3 py-2 bg-gray-500 text-white rounded text-sm">Reset</button>
-        <span id="ecgFilterCount" class="text-xs text-gray-400 ml-auto"></span>
+        <button class="reset-btn" onclick="resetECGFilters()">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 2L2 10M2 2l8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Reset
+        </button>
+        <span class="filter-count" id="ecgFilterCount"></span>
       </div>
 
-      <!-- Table -->
-      <table class="w-full bg-white" id="ecgTable">
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="p-2">ID</th>
-            <th class="p-2">Status</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-wrap">
+        <table id="ecgTable">
+          <thead><tr><th style="width:140px">Record ID</th><th>Clinical Status</th></tr></thead>
+          <tbody><tr class="empty-row"><td colspan="2" class="pulse">Loading dataset…</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- Arrhythmia Section -->
-    <div id="arrhythmiaSection" class="hidden">
-      <h2 class="text-xl font-bold mb-4">Arrhythmia Analysis</h2>
-
-      <!-- Dataset Toggle -->
-      <div class="flex gap-2 mb-4 bg-white p-3 rounded">
-        <button onclick="switchDataset('combined')" class="px-3 py-2 bg-blue-500 text-white rounded dataset-btn active">Combined (Train + Test)</button>
-        <button onclick="switchDataset('train')" class="px-3 py-2 bg-gray-500 text-white rounded dataset-btn">Training Set</button>
-        <button onclick="switchDataset('test')" class="px-3 py-2 bg-gray-500 text-white rounded dataset-btn">Test Set</button>
+    <!-- ARRHYTHMIA SECTION -->
+    <div id="arrhythmiaSection" class="section">
+      <div class="section-header">
+        <span class="section-title">MIT-BIH Arrhythmia Dataset</span>
+        <span class="section-sub">mitbih_train.csv · mitbih_test.csv</span>
       </div>
 
-      <!-- Summary Cards -->
-      <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="bg-white p-4 rounded shadow">Total Cases: <span id="arrTotal">0</span></div>
-        <div class="bg-white p-4 rounded shadow col-span-2">
-          <div>Classifications:</div>
-          <div class="text-sm mt-2">
-            0 (N): <span id="c0">0</span> |
-            1 (S): <span id="c1">0</span> |
-            2 (V): <span id="c2">0</span> |
-            3 (F): <span id="c3">0</span> |
-            4 (Q): <span id="c4">0</span>
+      <div class="dataset-toggle">
+        <button class="ds-btn active dataset-btn" onclick="switchDataset('combined', event)">Combined</button>
+        <button class="ds-btn dataset-btn" onclick="switchDataset('train', event)">Training Set</button>
+        <button class="ds-btn dataset-btn" onclick="switchDataset('test', event)">Test Set</button>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Records</div>
+          <div class="stat-value" id="arrTotal">—</div>
+        </div>
+        <div class="stat-card arr-classes">
+          <div class="stat-label">Class Distribution</div>
+          <div class="class-pills">
+            <div class="class-pill pill-n"><span class="class-pill-label">N — Normal</span><span class="class-pill-val" id="c0">—</span></div>
+            <div class="class-pill pill-s"><span class="class-pill-label">S — Supra.</span><span class="class-pill-val" id="c1">—</span></div>
+            <div class="class-pill pill-v"><span class="class-pill-label">V — Ventri.</span><span class="class-pill-val" id="c2">—</span></div>
+            <div class="class-pill pill-f"><span class="class-pill-label">F — Fusion</span><span class="class-pill-val" id="c3">—</span></div>
+            <div class="class-pill pill-q"><span class="class-pill-label">Q — Unknown</span><span class="class-pill-val" id="c4">—</span></div>
           </div>
         </div>
       </div>
 
-      <!-- Controls -->
-      <div class="flex gap-2 mb-4 flex-wrap items-center bg-white p-3 rounded shadow">
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">ID Range:</label>
-          <select id="arrIdRange" onchange="applyArrFilters()" class="p-2 border rounded text-sm">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <span class="filter-label">ID Range</span>
+          <select id="arrIdRange" class="filter-select" onchange="applyArrFilters()">
             <option value="all">All IDs</option>
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">Class:</label>
-          <select id="arrClassFilter" onchange="applyArrFilters()" class="p-2 border rounded text-sm">
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">Class</span>
+          <select id="arrClassFilter" class="filter-select" onchange="applyArrFilters()">
             <option value="all">All Classes</option>
             <option value="0">Normal (N)</option>
             <option value="1">Supraventricular (S)</option>
@@ -113,872 +481,416 @@
             <option value="4">Unknown (Q)</option>
           </select>
         </div>
-        <div class="flex items-center gap-2">
-          <label class="text-sm font-semibold text-gray-600">Sort:</label>
-          <select id="arrSort" onchange="applyArrFilters()" class="p-2 border rounded text-sm">
-            <option value="">None</option>
-            <option value="id">ID</option>
-            <option value="class">Class</option>
+        <div class="filter-divider"></div>
+        <div class="filter-group">
+          <span class="filter-label">Sort</span>
+          <select id="arrSort" class="filter-select" onchange="applyArrFilters()">
+            <option value="">Default</option>
+            <option value="id">By ID</option>
+            <option value="class">By Class</option>
           </select>
         </div>
-        <button onclick="resetArrFilters()" class="px-3 py-2 bg-gray-500 text-white rounded text-sm">Reset</button>
-        <span id="arrFilterCount" class="text-xs text-gray-400 ml-auto"></span>
+        <button class="reset-btn" onclick="resetArrFilters()">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 2L2 10M2 2l8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Reset
+        </button>
+        <span class="filter-count" id="arrFilterCount"></span>
       </div>
 
-      <!-- Table -->
-      <table class="w-full bg-white" id="arrTable">
-        <thead>
-          <tr class="bg-gray-200">
-            <th class="p-2">ID</th>
-            <th class="p-2">Dataset</th>
-            <th class="p-2">Class</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div class="table-wrap">
+        <table id="arrTable">
+          <thead><tr><th style="width:140px">Record ID</th><th>Dataset Split</th><th>Arrhythmia Class</th></tr></thead>
+          <tbody><tr class="empty-row"><td colspan="3" class="pulse">Loading dataset…</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- ==================== VISUALIZATIONS & DEEP ANALYSIS SECTION ==================== -->
-    <div id="vizSection" class="hidden">
-      <h2 class="text-xl font-bold mb-2">Visualizations &amp; Deep Analysis</h2>
-      <p class="text-gray-500 text-sm mb-6">Statistical analysis and chart visualizations across all datasets. Load your CSV files first.</p>
-
-      <!-- Dataset selector for viz -->
-      <div class="flex gap-2 mb-6 bg-white p-3 rounded shadow flex-wrap">
-        <span class="text-sm font-semibold self-center text-gray-600 mr-2">Dataset:</span>
-        <button onclick="switchVizDataset('arrhythmia_combined', event)" class="px-3 py-2 bg-blue-500 text-white rounded text-sm viz-ds-btn active">Arrhythmia (Combined)</button>
-        <button onclick="switchVizDataset('arrhythmia_train', event)" class="px-3 py-2 bg-gray-400 text-white rounded text-sm viz-ds-btn">Arrhythmia (Train)</button>
-        <button onclick="switchVizDataset('arrhythmia_test', event)" class="px-3 py-2 bg-gray-400 text-white rounded text-sm viz-ds-btn">Arrhythmia (Test)</button>
-        <button onclick="switchVizDataset('ecg', event)" class="px-3 py-2 bg-gray-400 text-white rounded text-sm viz-ds-btn">ECG (PTB)</button>
+    <!-- VIZ SECTION -->
+    <div id="vizSection" class="section">
+      <div class="section-header">
+        <span class="section-title">Visualizations &amp; Deep Analysis</span>
+        <span class="section-sub">Statistical analysis across all datasets</span>
       </div>
 
-      <!-- Charts Row 1: Bar + Doughnut -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      <div class="viz-ds-bar">
+        <span class="viz-ds-label">Dataset</span>
+        <button class="viz-ds-btn active" onclick="switchVizDataset('arrhythmia_combined', event)">Arrhythmia (Combined)</button>
+        <button class="viz-ds-btn" onclick="switchVizDataset('arrhythmia_train', event)">Arrhythmia (Train)</button>
+        <button class="viz-ds-btn" onclick="switchVizDataset('arrhythmia_test', event)">Arrhythmia (Test)</button>
+        <button class="viz-ds-btn" onclick="switchVizDataset('ecg', event)">ECG (PTB)</button>
+      </div>
 
-        <!-- Bar Chart -->
-        <div class="bg-white p-4 rounded shadow">
-          <h3 class="font-semibold text-gray-700 mb-3">Top Class Counts (Bar Chart)</h3>
-          <div style="position:relative; width:100%; height:320px;">
-            <canvas id="barChart" role="img" aria-label="Horizontal bar chart showing top class counts in the dataset"></canvas>
-          </div>
+      <div class="chart-grid">
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">Class Counts</div>
+          <div style="position:relative;width:100%;height:280px;"><canvas id="barChart"></canvas></div>
         </div>
-
-        <!-- Doughnut Chart -->
-        <div class="bg-white p-4 rounded shadow">
-          <h3 class="font-semibold text-gray-700 mb-3">Class Distribution (Doughnut)</h3>
-          <div id="doughnutLegend" class="flex flex-wrap gap-2 mb-2 text-xs"></div>
-          <div style="position:relative; width:100%; height:280px;">
-            <canvas id="doughnutChart" role="img" aria-label="Doughnut chart showing class distribution"></canvas>
-          </div>
+        <div class="card" style="margin-bottom:0">
+          <div class="card-title">Class Distribution</div>
+          <div class="donut-legend" id="doughnutLegend"></div>
+          <div style="position:relative;width:100%;height:238px;"><canvas id="doughnutChart"></canvas></div>
         </div>
       </div>
 
-      <!-- Scatter Plot -->
-      <div class="bg-white p-4 rounded shadow mb-6">
-        <h3 class="font-semibold text-gray-700 mb-1">Class vs. Sample Index (Scatter Plot)</h3>
-        <p class="text-xs text-gray-400 mb-3">Sampled 500 records for performance. Visualizes class spread across dataset positions.</p>
-        <div style="position:relative; width:100%; height:300px;">
-          <canvas id="scatterChart" role="img" aria-label="Scatter plot of class vs sample index"></canvas>
-        </div>
+      <div class="card">
+        <div class="card-title">Class vs. Sample Index</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Sampled 500 records — visualizes class spread across dataset positions.</p>
+        <div style="position:relative;width:100%;height:260px;"><canvas id="scatterChart"></canvas></div>
       </div>
 
-      <!-- Statistical Analysis Table -->
-      <div class="bg-white p-4 rounded shadow mb-6">
-        <h3 class="font-semibold text-gray-700 mb-3">Statistical Analysis</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm" id="statsTable">
-            <thead>
-              <tr class="bg-gray-100">
-                <th class="p-2 text-left">Metric</th>
-                <th class="p-2 text-left">Value</th>
-                <th class="p-2 text-left">Description</th>
-              </tr>
-            </thead>
-            <tbody id="statsTableBody">
-              <tr><td colspan="3" class="p-4 text-center text-gray-400">Loading data...</td></tr>
-            </tbody>
+      <div class="card">
+        <div class="card-title">Statistical Analysis</div>
+        <div style="overflow-x:auto;">
+          <table class="stats-table">
+            <thead><tr><th>Metric</th><th>Value</th><th>Description</th></tr></thead>
+            <tbody id="statsTableBody"><tr><td colspan="3" style="text-align:center;padding:32px;color:var(--muted)" class="pulse">Loading data…</td></tr></tbody>
           </table>
         </div>
       </div>
 
-      <!-- Narrative Insights -->
-      <div class="bg-white p-4 rounded shadow mb-6">
-        <h3 class="font-semibold text-gray-700 mb-3">Narrative Insights</h3>
-        <div id="insightsBox" class="text-sm text-gray-600 leading-relaxed space-y-2">
-          <p class="text-gray-400">Loading insights...</p>
+      <div class="card">
+        <div class="card-title">Narrative Insights</div>
+        <div class="insights-box" id="insightsBox">
+          <p class="pulse" style="color:var(--muted)">Loading insights…</p>
         </div>
       </div>
     </div>
-    <!-- ==================== END VISUALIZATIONS SECTION ==================== -->
 
   </div>
 
   <script>
-    // ===================== GLOBAL DATA STORAGE =====================
-    let ecgData = [];
-    let arrhythmiaTrainData = [];
-    let arrhythmiaTestData = [];
-    let arrhythmiaCombinedData = [];
-    let currentArrhythmiaView = 'combined';
-    let currentVizDataset = 'arrhythmia_combined';
+    let ecgData = [], arrhythmiaTrainData = [], arrhythmiaTestData = [], arrhythmiaCombinedData = [];
+    let currentArrhythmiaView = 'combined', currentVizDataset = 'arrhythmia_combined';
+    let barChartInstance = null, doughnutChartInstance = null, scatterChartInstance = null;
 
-    // Chart instances
-    let barChartInstance = null;
-    let doughnutChartInstance = null;
-    let scatterChartInstance = null;
-
-    /**
-     * loadDataset() - Entry point for loading all datasets
-     * Loads all datasets from CSV files
-     */
     async function loadDataset() {
       try {
-        // Load ECG data (normal + abnormal)
-        const normalECG = await loadCSV('ptbdb_normal.csv');
-        const abnormalECG = await loadCSV('ptbdb_abnormal.csv');
+        const nECG = await loadCSV('ptbdb_normal.csv');
+        const aECG = await loadCSV('ptbdb_abnormal.csv');
+        ecgData = nECG.map((_,i) => ({id:i+1, status:'Normal'}))
+                      .concat(aECG.map((_,i) => ({id:nECG.length+i+1, status:'Abnormal'})));
 
-        ecgData = normalECG.map((row, i) => ({
-          id: i + 1,
-          status: 'Normal'
-        })).concat(
-          abnormalECG.map((row, i) => ({
-            id: normalECG.length + i + 1,
-            status: 'Abnormal'
-          }))
-        );
+        const tr = await loadCSV('mitbih_train.csv');
+        arrhythmiaTrainData = tr.map((row,i) => ({id:i+1, dataset:'Training', class:parseInt(row[row.length-1])}));
 
-        // Load Arrhythmia training data
-        const trainRecords = await loadCSV('mitbih_train.csv');
-        arrhythmiaTrainData = trainRecords.map((row, i) => ({
-          id: i + 1,
-          dataset: 'Training',
-          class: parseInt(row[row.length - 1]) // Last column is the class
-        }));
+        const te = await loadCSV('mitbih_test.csv');
+        arrhythmiaTestData = te.map((row,i) => ({id:i+1, dataset:'Test', class:parseInt(row[row.length-1])}));
 
-        // Load Arrhythmia test data
-        const testRecords = await loadCSV('mitbih_test.csv');
-        arrhythmiaTestData = testRecords.map((row, i) => ({
-          id: i + 1,
-          dataset: 'Test',
-          class: parseInt(row[row.length - 1]) // Last column is the class
-        }));
-
-        // Combine both datasets
         arrhythmiaCombinedData = [...arrhythmiaTrainData, ...arrhythmiaTestData];
 
-        // Render tables and summaries
-        renderECGTable(ecgData);
-        updateECGSummary(ecgData);
-        renderArrhythmiaTable(arrhythmiaCombinedData);
-        updateArrhythmiaSummary(arrhythmiaCombinedData);
-      } catch (error) {
-        console.error('Error loading datasets:', error);
-      }
+        renderECGTable(ecgData);     updateECGSummary(ecgData);
+        renderArrTable(arrhythmiaCombinedData); updateArrSummary(arrhythmiaCombinedData);
+      } catch(e) { console.error('Load error:', e); }
     }
 
-    /**
-     * loadCSV(filePath) - Parses a CSV file into a 2D array
-     * @param {string} filePath - Path to the CSV file
-     * @returns {Promise<Array[]>} 2D array of CSV data
-     */
-    async function loadCSV(filePath) {
-      const response = await fetch(filePath);
-      const text = await response.text();
-      const rows = text.trim().split('\n');
-
-      return rows.map(row => {
-        // Simple CSV parsing (handles comma-separated values)
-        return row.split(',').map(cell => cell.trim());
-      });
+    async function loadCSV(path) {
+      const r = await fetch(path);
+      const t = await r.text();
+      return t.trim().split('\n').map(row => row.split(',').map(c => c.trim()));
     }
 
-    /**
-     * showSection(sectionName) - Toggles between ECG, Arrhythmia, and Viz sections
-     */
-    function showSection(sectionName) {
-      document.getElementById('ecgSection').classList.add('hidden');
-      document.getElementById('arrhythmiaSection').classList.add('hidden');
-      document.getElementById('vizSection').classList.add('hidden');
-
-      if (sectionName === 'ecg') {
-        document.getElementById('ecgSection').classList.remove('hidden');
-      } else if (sectionName === 'arrhythmia') {
-        document.getElementById('arrhythmiaSection').classList.remove('hidden');
-      } else if (sectionName === 'viz') {
-        document.getElementById('vizSection').classList.remove('hidden');
-        renderViz(currentVizDataset);
-      }
+    // ── Navigation ──
+    function showSection(name, btn) {
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.getElementById(name+'Section').classList.add('active');
+      if (btn) btn.classList.add('active');
+      if (name === 'viz') renderViz(currentVizDataset);
     }
 
-    /**
-     * switchDataset(type) - Switch between combined, train, and test arrhythmia data
-     */
-    function switchDataset(type) {
+    function switchDataset(type, event) {
       currentArrhythmiaView = type;
-      let dataToDisplay;
-
-      if (type === 'combined') {
-        dataToDisplay = arrhythmiaCombinedData;
-      } else if (type === 'train') {
-        dataToDisplay = arrhythmiaTrainData;
-      } else if (type === 'test') {
-        dataToDisplay = arrhythmiaTestData;
-      }
-
-      // Update button states
-      document.querySelectorAll('.dataset-btn').forEach(btn => {
-        btn.classList.remove('active', 'bg-blue-500');
-        btn.classList.add('bg-gray-500');
-      });
-      event.target.classList.add('active', 'bg-blue-500');
-      event.target.classList.remove('bg-gray-500');
-
-      // Re-render table and summaries
-      renderArrhythmiaTable(dataToDisplay);
-      updateArrhythmiaSummary(dataToDisplay);
+      const data = type==='combined' ? arrhythmiaCombinedData : type==='train' ? arrhythmiaTrainData : arrhythmiaTestData;
+      document.querySelectorAll('.dataset-btn').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
+      renderArrTable(data);
+      updateArrSummary(data);
     }
 
-    /**
-     * buildIdRangeOptions(total, selectId) - Populate ID range dropdown in steps of 100
-     */
+    // ── Summary ──
+    function updateECGSummary(data) {
+      document.getElementById('ecgTotal').textContent    = data.length.toLocaleString();
+      document.getElementById('ecgNormal').textContent   = data.filter(d=>d.status==='Normal').length.toLocaleString();
+      document.getElementById('ecgAbnormal').textContent = data.filter(d=>d.status==='Abnormal').length.toLocaleString();
+    }
+    function updateArrSummary(data) {
+      document.getElementById('arrTotal').textContent = data.length.toLocaleString();
+      [0,1,2,3,4].forEach(c => { document.getElementById('c'+c).textContent = data.filter(d=>d.class===c).length.toLocaleString(); });
+    }
+
+    // ── ID Range builder — defaults to 1-100 ──
     function buildIdRangeOptions(total, selectId) {
       const sel = document.getElementById(selectId);
-      // Keep first "All IDs" option, remove any old range options
       while (sel.options.length > 1) sel.remove(1);
-      for (let start = 1; start <= total; start += 100) {
-        const end = Math.min(start + 99, total);
+      for (let s=1; s<=total; s+=100) {
+        const e = Math.min(s+99, total);
         const opt = document.createElement('option');
-        opt.value = `${start}-${end}`;
-        opt.textContent = `ID ${start}–${end}`;
+        opt.value = `${s}-${e}`;
+        opt.textContent = `ID ${s.toLocaleString()}–${e.toLocaleString()}`;
         sel.appendChild(opt);
       }
+      // Default: select first range (1-100)
+      if (sel.options.length > 1) sel.selectedIndex = 1;
     }
 
-    /**
-     * renderECGTable(data) - Populates ECG table with data and builds range options
-     */
+    // ── ECG Table ──
     function renderECGTable(data) {
       buildIdRangeOptions(data.length, 'ecgIdRange');
       applyECGFilters();
     }
 
-    /**
-     * applyECGFilters() - Filter + sort + render ECG table based on current filter state
-     */
     function applyECGFilters() {
-      const rangeVal = document.getElementById('ecgIdRange').value;
-      const statusVal = document.getElementById('ecgStatusFilter').value;
-      const sortVal = document.getElementById('ecgSort').value;
+      const rng = document.getElementById('ecgIdRange').value;
+      const sts = document.getElementById('ecgStatusFilter').value;
+      const srt = document.getElementById('ecgSort').value;
 
-      let filtered = [...ecgData];
+      let f = [...ecgData];
+      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
+      if (sts !== 'all') f = f.filter(r=>r.status===sts);
+      if (srt==='id')     f.sort((a,b)=>a.id-b.id);
+      if (srt==='status') f.sort((a,b)=>a.status.localeCompare(b.status));
 
-      // ID range filter
-      if (rangeVal !== 'all') {
-        const [lo, hi] = rangeVal.split('-').map(Number);
-        filtered = filtered.filter(r => r.id >= lo && r.id <= hi);
-      }
+      document.getElementById('ecgFilterCount').textContent = `${f.length.toLocaleString()} of ${ecgData.length.toLocaleString()} records`;
 
-      // Status filter
-      if (statusVal !== 'all') {
-        filtered = filtered.filter(r => r.status === statusVal);
-      }
-
-      // Sort
-      if (sortVal === 'id') filtered.sort((a, b) => a.id - b.id);
-      else if (sortVal === 'status') filtered.sort((a, b) => a.status.localeCompare(b.status));
-
-      // Update count badge
-      document.getElementById('ecgFilterCount').textContent =
-        `Showing ${filtered.length.toLocaleString()} of ${ecgData.length.toLocaleString()} records`;
-
-      // Render rows
       const tbody = document.querySelector('#ecgTable tbody');
       tbody.innerHTML = '';
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;padding:20px;">No records match the selected filters.</td></tr>';
-        return;
-      }
-      filtered.forEach(row => {
+      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="2">No records match the selected filters.</td></tr>'; return; }
+      f.forEach(row => {
         const tr = document.createElement('tr');
-        tr.className = 'border-b hover:bg-gray-50';
-        tr.innerHTML = `
-          <td class="p-2">${row.id}</td>
-          <td class="p-2">
-            <span class="px-2 py-1 rounded ${row.status === 'Normal' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-              ${row.status}
-            </span>
-          </td>
-        `;
+        tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+          <td><span class="badge badge-${row.status.toLowerCase()}">${row.status}</span></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    /**
-     * resetECGFilters() - Reset all ECG filters to default
-     */
     function resetECGFilters() {
-      document.getElementById('ecgIdRange').value = 'all';
+      const sel = document.getElementById('ecgIdRange');
+      if (sel.options.length > 1) sel.selectedIndex = 1;
       document.getElementById('ecgStatusFilter').value = 'all';
       document.getElementById('ecgSort').value = '';
       applyECGFilters();
     }
 
-    /**
-     * renderArrhythmiaTable(data) - Populates Arrhythmia table and builds range options
-     */
-    function renderArrhythmiaTable(data) {
+    // ── Arrhythmia Table ──
+    function renderArrTable(data) {
       buildIdRangeOptions(data.length, 'arrIdRange');
-      // Reset class filter when dataset changes
-      document.getElementById('arrClassFilter').value = 'all';
-      document.getElementById('arrIdRange').value = 'all';
-      applyArrFilters();
-    }
-
-    /**
-     * applyArrFilters() - Filter + sort + render Arrhythmia table
-     */
-    function applyArrFilters() {
-      const rangeVal = document.getElementById('arrIdRange').value;
-      const classVal = document.getElementById('arrClassFilter').value;
-      const sortVal = document.getElementById('arrSort').value;
-
-      let source;
-      if (currentArrhythmiaView === 'combined') source = arrhythmiaCombinedData;
-      else if (currentArrhythmiaView === 'train') source = arrhythmiaTrainData;
-      else source = arrhythmiaTestData;
-
-      let filtered = [...source];
-
-      // ID range filter
-      if (rangeVal !== 'all') {
-        const [lo, hi] = rangeVal.split('-').map(Number);
-        filtered = filtered.filter(r => r.id >= lo && r.id <= hi);
-      }
-
-      // Class filter
-      if (classVal !== 'all') {
-        filtered = filtered.filter(r => r.class === parseInt(classVal));
-      }
-
-      // Sort
-      if (sortVal === 'id') filtered.sort((a, b) => a.id - b.id);
-      else if (sortVal === 'class') filtered.sort((a, b) => a.class - b.class);
-
-      // Update count badge
-      document.getElementById('arrFilterCount').textContent =
-        `Showing ${filtered.length.toLocaleString()} of ${source.length.toLocaleString()} records`;
-
-      const tbody = document.querySelector('#arrTable tbody');
-      tbody.innerHTML = '';
-
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;">No records match the selected filters.</td></tr>';
-        return;
-      }
-
-      const classLabels = { 0: 'N (Normal)', 1: 'S (Supraventricular)', 2: 'V (Ventricular)', 3: 'F (Fusion)', 4: 'Q (Unknown)' };
-      const classBadge = { 0: 'bg-blue-100 text-blue-800', 1: 'bg-purple-100 text-purple-800', 2: 'bg-yellow-100 text-yellow-800', 3: 'bg-pink-100 text-pink-800', 4: 'bg-gray-100 text-gray-700' };
-
-      filtered.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.className = 'border-b hover:bg-gray-50';
-        tr.innerHTML = `
-          <td class="p-2">${row.id}</td>
-          <td class="p-2">
-            <span class="px-2 py-1 rounded text-xs ${row.dataset === 'Training' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}">
-              ${row.dataset}
-            </span>
-          </td>
-          <td class="p-2">
-            <span class="px-2 py-1 rounded text-xs ${classBadge[row.class] || 'bg-gray-100 text-gray-700'}">
-              ${classLabels[row.class] || 'Unknown'}
-            </span>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    /**
-     * resetArrFilters() - Reset all Arrhythmia filters to default
-     */
-    function resetArrFilters() {
-      document.getElementById('arrIdRange').value = 'all';
       document.getElementById('arrClassFilter').value = 'all';
       document.getElementById('arrSort').value = '';
       applyArrFilters();
     }
 
-    // ===================== SUMMARY UPDATERS =====================
+    function applyArrFilters() {
+      const rng = document.getElementById('arrIdRange').value;
+      const cls = document.getElementById('arrClassFilter').value;
+      const srt = document.getElementById('arrSort').value;
 
-    function updateECGSummary(data) {
-      document.getElementById('ecgTotal').textContent = data.length;
-      document.getElementById('ecgNormal').textContent = data.filter(d => d.status === 'Normal').length;
-      document.getElementById('ecgAbnormal').textContent = data.filter(d => d.status === 'Abnormal').length;
-    }
+      const src = currentArrhythmiaView==='combined' ? arrhythmiaCombinedData : currentArrhythmiaView==='train' ? arrhythmiaTrainData : arrhythmiaTestData;
+      let f = [...src];
+      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
+      if (cls !== 'all') f = f.filter(r=>r.class===parseInt(cls));
+      if (srt==='id')    f.sort((a,b)=>a.id-b.id);
+      if (srt==='class') f.sort((a,b)=>a.class-b.class);
 
-    function updateArrhythmiaSummary(data) {
-      document.getElementById('arrTotal').textContent = data.length;
-      [0,1,2,3,4].forEach(c => {
-        document.getElementById('c' + c).textContent = data.filter(d => d.class === c).length;
-      });
-    }
+      document.getElementById('arrFilterCount').textContent = `${f.length.toLocaleString()} of ${src.length.toLocaleString()} records`;
 
-    // ===================== STATISTICAL FUNCTIONS (Student 2 — feature/viz-analysis) =====================
-
-    /**
-     * stdDev(values) - Computes population standard deviation
-     * @param {number[]} values
-     * @returns {number}
-     */
-    function stdDev(values) {
-      const n = values.length;
-      if (n === 0) return 0;
-      const mean = values.reduce((a, b) => a + b, 0) / n;
-      return Math.sqrt(values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n);
-    }
-
-    /**
-     * variance(values) - Computes population variance
-     * @param {number[]} values
-     * @returns {number}
-     */
-    function variance(values) {
-      const n = values.length;
-      if (n === 0) return 0;
-      const mean = values.reduce((a, b) => a + b, 0) / n;
-      return values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
-    }
-
-    /**
-     * pearsonCorr(xs, ys) - Computes Pearson correlation coefficient
-     * @param {number[]} xs
-     * @param {number[]} ys
-     * @returns {number} r in [-1, 1]
-     */
-    function pearsonCorr(xs, ys) {
-      const n = xs.length;
-      if (n === 0) return 0;
-      const meanX = xs.reduce((a, b) => a + b, 0) / n;
-      const meanY = ys.reduce((a, b) => a + b, 0) / n;
-      let num = 0, denX = 0, denY = 0;
-      for (let i = 0; i < n; i++) {
-        const dx = xs[i] - meanX;
-        const dy = ys[i] - meanY;
-        num += dx * dy;
-        denX += dx * dx;
-        denY += dy * dy;
-      }
-      const den = Math.sqrt(denX * denY);
-      return den === 0 ? 0 : num / den;
-    }
-
-    /**
-     * linearRegression(xs, ys) - Returns slope, intercept, and R²
-     * @param {number[]} xs
-     * @param {number[]} ys
-     * @returns {{ slope: number, intercept: number, r2: number }}
-     */
-    function linearRegression(xs, ys) {
-      const n = xs.length;
-      if (n === 0) return { slope: 0, intercept: 0, r2: 0 };
-      const meanX = xs.reduce((a, b) => a + b, 0) / n;
-      const meanY = ys.reduce((a, b) => a + b, 0) / n;
-      let num = 0, den = 0;
-      for (let i = 0; i < n; i++) {
-        num += (xs[i] - meanX) * (ys[i] - meanY);
-        den += Math.pow(xs[i] - meanX, 2);
-      }
-      const slope = den === 0 ? 0 : num / den;
-      const intercept = meanY - slope * meanX;
-      const r = pearsonCorr(xs, ys);
-      return { slope, intercept, r2: r * r };
-    }
-
-    // ===================== VIZ DATASET SWITCHER =====================
-
-    /**
-     * switchVizDataset(type, evt) - Switch dataset for the viz section
-     */
-    function switchVizDataset(type, evt) {
-      currentVizDataset = type;
-      document.querySelectorAll('.viz-ds-btn').forEach(btn => {
-        btn.classList.remove('bg-blue-500', 'active');
-        btn.classList.add('bg-gray-400');
-      });
-      evt.target.classList.add('bg-blue-500', 'active');
-      evt.target.classList.remove('bg-gray-400');
-      renderViz(type);
-    }
-
-    /**
-     * getVizData(type) - Returns the correct dataset based on selection
-     */
-    function getVizData(type) {
-      if (type === 'arrhythmia_combined') return arrhythmiaCombinedData;
-      if (type === 'arrhythmia_train') return arrhythmiaTrainData;
-      if (type === 'arrhythmia_test') return arrhythmiaTestData;
-      if (type === 'ecg') return ecgData;
-      return [];
-    }
-
-    /**
-     * renderViz(type) - Master render: draws all charts and analysis for selected dataset
-     */
-    function renderViz(type) {
-      const data = getVizData(type);
-      if (data.length === 0) {
-        document.getElementById('statsTableBody').innerHTML =
-          '<tr><td colspan="3" class="p-4 text-center text-gray-400">No data loaded. Please ensure CSV files are available in the archive/ folder.</td></tr>';
-        document.getElementById('insightsBox').innerHTML =
-          '<p class="text-gray-400">No data loaded. Please ensure CSV files are available.</p>';
-        return;
-      }
-      drawBarChart(data, type);
-      drawDoughnut(data, type);
-      drawScatterPlot(data, type);
-      renderAnalysis(data, type);
-      renderInsights(data, type);
-    }
-
-    // ===================== CHART DRAWING FUNCTIONS =====================
-
-    /**
-     * drawBarChart(data, type) - Horizontal bar chart: top 10 class/status counts
-     */
-    function drawBarChart(data, type) {
-      if (barChartInstance) { barChartInstance.destroy(); barChartInstance = null; }
-
-      let labels, counts;
-      const classLabels = { 0: 'N - Normal', 1: 'S - Supraventricular', 2: 'V - Ventricular', 3: 'F - Fusion', 4: 'Q - Unknown' };
-      const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16'];
-
-      if (type === 'ecg') {
-        labels = ['Normal', 'Abnormal'];
-        counts = [
-          data.filter(d => d.status === 'Normal').length,
-          data.filter(d => d.status === 'Abnormal').length
-        ];
-      } else {
-        const classCounts = {};
-        data.forEach(d => { classCounts[d.class] = (classCounts[d.class] || 0) + 1; });
-        const sorted = Object.entries(classCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-        labels = sorted.map(([k]) => classLabels[k] || 'Class ' + k);
-        counts = sorted.map(([, v]) => v);
-      }
-
-      const ctx = document.getElementById('barChart').getContext('2d');
-      barChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Count',
-            data: counts,
-            backgroundColor: colors.slice(0, labels.length),
-            borderWidth: 0,
-            borderRadius: 4
-          }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: ctx => ' ' + ctx.parsed.x.toLocaleString() + ' records'
-              }
-            }
-          },
-          scales: {
-            x: {
-              beginAtZero: true,
-              ticks: { color: '#6b7280', callback: v => v.toLocaleString() },
-              grid: { color: '#f3f4f6' }
-            },
-            y: { ticks: { color: '#374151', font: { size: 12 } }, grid: { display: false } }
-          }
-        }
-      });
-    }
-
-    /**
-     * drawDoughnut(data, type) - Doughnut chart: class/status distribution
-     */
-    function drawDoughnut(data, type) {
-      if (doughnutChartInstance) { doughnutChartInstance.destroy(); doughnutChartInstance = null; }
-
-      let labels, counts;
-      const classLabels = { 0: 'N - Normal', 1: 'S - Supraventricular', 2: 'V - Ventricular', 3: 'F - Fusion', 4: 'Q - Unknown' };
-      const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
-
-      if (type === 'ecg') {
-        labels = ['Normal', 'Abnormal'];
-        counts = [
-          data.filter(d => d.status === 'Normal').length,
-          data.filter(d => d.status === 'Abnormal').length
-        ];
-      } else {
-        const classCounts = {};
-        data.forEach(d => { classCounts[d.class] = (classCounts[d.class] || 0) + 1; });
-        const sorted = Object.entries(classCounts).sort((a, b) => b[1] - a[1]);
-        labels = sorted.map(([k]) => classLabels[k] || 'Class ' + k);
-        counts = sorted.map(([, v]) => v);
-      }
-
-      const total = counts.reduce((a, b) => a + b, 0);
-
-      // Build custom legend
-      const legendEl = document.getElementById('doughnutLegend');
-      legendEl.innerHTML = labels.map((l, i) => {
-        const pct = total > 0 ? ((counts[i] / total) * 100).toFixed(1) : '0.0';
-        return `<span style="display:flex;align-items:center;gap:4px;">
-          <span style="width:10px;height:10px;border-radius:2px;background:${colors[i % colors.length]};flex-shrink:0;"></span>
-          <span style="color:#374151;">${l} (${pct}%)</span>
-        </span>`;
-      }).join('');
-
-      const ctx = document.getElementById('doughnutChart').getContext('2d');
-      doughnutChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{
-            data: counts,
-            backgroundColor: colors.slice(0, labels.length),
-            borderWidth: 2,
-            borderColor: '#ffffff'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '60%',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: ctx => {
-                  const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0';
-                  return ` ${ctx.parsed.toLocaleString()} records (${pct}%)`;
-                }
-              }
-            }
-          }
-        }
-      });
-    }
-
-    /**
-     * drawScatterPlot(data, type) - Scatter: index vs class value, sampled 500 points
-     */
-    function drawScatterPlot(data, type) {
-      if (scatterChartInstance) { scatterChartInstance.destroy(); scatterChartInstance = null; }
-
-      // Sample evenly for performance
-      const sampleSize = Math.min(500, data.length);
-      const step = Math.max(1, Math.floor(data.length / sampleSize));
-      const sampled = [];
-      for (let i = 0; i < data.length && sampled.length < sampleSize; i += step) {
-        const item = data[i];
-        sampled.push({
-          x: i,
-          y: type === 'ecg' ? (item.status === 'Normal' ? 0 : 1) : item.class
-        });
-      }
-
-      const classColors = { 0: '#3b82f6', 1: '#10b981', 2: '#f59e0b', 3: '#ef4444', 4: '#8b5cf6' };
-      const yLabels = type === 'ecg'
-        ? { 0: 'Normal', 1: 'Abnormal' }
-        : { 0: 'N', 1: 'S', 2: 'V', 3: 'F', 4: 'Q' };
-
-      // Group by class for separate datasets (enables legend + per-class color)
-      const grouped = {};
-      sampled.forEach(pt => {
-        if (!grouped[pt.y]) grouped[pt.y] = [];
-        grouped[pt.y].push(pt);
-      });
-
-      const datasets = Object.entries(grouped).map(([cls, pts]) => ({
-        label: yLabels[cls] || 'Class ' + cls,
-        data: pts,
-        backgroundColor: (classColors[cls] || '#888') + 'aa',
-        pointRadius: 3,
-        pointHoverRadius: 5
-      }));
-
-      const maxY = type === 'ecg' ? 1 : 4;
-
-      const ctx = document.getElementById('scatterChart').getContext('2d');
-      scatterChartInstance = new Chart(ctx, {
-        type: 'scatter',
-        data: { datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: true,
-              position: 'top',
-              labels: { usePointStyle: true, pointStyle: 'circle', font: { size: 11 }, color: '#374151' }
-            }
-          },
-          scales: {
-            x: {
-              title: { display: true, text: 'Sample Index', color: '#6b7280' },
-              ticks: { color: '#6b7280' },
-              grid: { color: '#f3f4f6' }
-            },
-            y: {
-              min: -0.5,
-              max: maxY + 0.5,
-              title: { display: true, text: 'Class', color: '#6b7280' },
-              ticks: {
-                color: '#6b7280',
-                stepSize: 1,
-                callback: v => yLabels[v] !== undefined ? yLabels[v] : ''
-              },
-              grid: { color: '#f3f4f6' }
-            }
-          }
-        }
-      });
-    }
-
-    // ===================== ANALYSIS & INSIGHTS =====================
-
-    /**
-     * renderAnalysis(data, type) - Populate all stat tables with stdDev, variance,
-     * pearsonCorr, linearRegression, and class distribution metrics
-     */
-    function renderAnalysis(data, type) {
-      const tbody = document.getElementById('statsTableBody');
+      const meta = {
+        0:{label:'N — Normal',          badge:'badge-n'},
+        1:{label:'S — Supraventricular',badge:'badge-s'},
+        2:{label:'V — Ventricular',     badge:'badge-v'},
+        3:{label:'F — Fusion',          badge:'badge-f'},
+        4:{label:'Q — Unknown',         badge:'badge-q'},
+      };
+      const tbody = document.querySelector('#arrTable tbody');
       tbody.innerHTML = '';
-
-      const total = data.length;
-      let classValues;
-
-      if (type === 'ecg') {
-        classValues = data.map(d => d.status === 'Normal' ? 0 : 1);
-      } else {
-        classValues = data.map(d => d.class);
-      }
-
-      const mean = classValues.reduce((a, b) => a + b, 0) / total;
-      const sd = stdDev(classValues);
-      const vari = variance(classValues);
-
-      // Use sampled indices for correlation / regression (full array for accuracy)
-      const indices = classValues.map((_, i) => i);
-      const corr = pearsonCorr(indices, classValues);
-      const lr = linearRegression(indices, classValues);
-
-      // Class distribution stats
-      const classCounts = {};
-      classValues.forEach(v => { classCounts[v] = (classCounts[v] || 0) + 1; });
-      const maxClass = Math.max(...Object.values(classCounts));
-      const minClass = Math.min(...Object.values(classCounts));
-      const imbalanceRatio = minClass > 0 ? (maxClass / minClass).toFixed(2) : 'N/A';
-
-      const rows = [
-        { metric: 'Total Records',                      value: total.toLocaleString(),      desc: 'Number of records in the selected dataset' },
-        { metric: 'Mean Class Value',                   value: mean.toFixed(4),             desc: 'Average of class / label values' },
-        { metric: 'Standard Deviation',                 value: sd.toFixed(4),               desc: 'Spread of class values around the mean' },
-        { metric: 'Variance',                           value: vari.toFixed(4),             desc: 'Squared standard deviation — measures class dispersion' },
-        { metric: 'Pearson Correlation (index vs class)', value: corr.toFixed(4),           desc: 'Linear correlation between sample position and class label' },
-        { metric: 'Linear Regression Slope',            value: lr.slope.toFixed(6),         desc: 'Rate of class change per sample index unit' },
-        { metric: 'Linear Regression Intercept',        value: lr.intercept.toFixed(4),     desc: 'Predicted class value at sample index 0' },
-        { metric: 'R² (Goodness of Fit)',               value: lr.r2.toFixed(4),            desc: 'Proportion of class variation explained by sample index' },
-        { metric: 'Class Imbalance Ratio',              value: imbalanceRatio.toString(),   desc: 'Most common : least common class count (1.0 = balanced)' },
-        { metric: 'Unique Classes',                     value: Object.keys(classCounts).length.toString(), desc: 'Number of distinct class labels in the dataset' },
-      ];
-
-      rows.forEach((r, i) => {
+      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="3">No records match the selected filters.</td></tr>'; return; }
+      f.forEach(row => {
+        const m = meta[row.class]||{label:'Unknown',badge:'badge-q'};
         const tr = document.createElement('tr');
-        tr.className = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-        tr.innerHTML = `
-          <td class="p-2 font-medium text-gray-700">${r.metric}</td>
-          <td class="p-2 text-blue-700 font-mono">${r.value}</td>
-          <td class="p-2 text-gray-500 text-xs">${r.desc}</td>
-        `;
+        tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+          <td><span class="badge badge-${row.dataset==='Training'?'train':'test'}">${row.dataset}</span></td>
+          <td><span class="badge ${m.badge}">${m.label}</span></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    /**
-     * renderInsights(data, type) - Written narrative findings based on statistical results
-     */
-    function renderInsights(data, type) {
-      const box = document.getElementById('insightsBox');
-      const total = data.length;
-      let insights = [];
-
-      if (type === 'ecg') {
-        const normal = data.filter(d => d.status === 'Normal').length;
-        const abnormal = data.filter(d => d.status === 'Abnormal').length;
-        const normalPct = ((normal / total) * 100).toFixed(1);
-        const abnormalPct = ((abnormal / total) * 100).toFixed(1);
-        const classValues = data.map(d => d.status === 'Normal' ? 0 : 1);
-        const sd = stdDev(classValues);
-
-        insights = [
-          `<strong>Dataset Overview:</strong> The PTB ECG dataset contains <strong>${total.toLocaleString()}</strong> records — <strong>${normal.toLocaleString()} Normal (${normalPct}%)</strong> and <strong>${abnormal.toLocaleString()} Abnormal (${abnormalPct}%)</strong>.`,
-          `<strong>Class Balance:</strong> ${
-            Math.abs(normal - abnormal) / total < 0.1
-              ? 'The dataset is relatively balanced between Normal and Abnormal cases, which is favorable for model training without special resampling.'
-              : normal > abnormal
-                ? `Normal cases outnumber Abnormal by ${(normal / abnormal).toFixed(2)}×. This imbalance may cause classifiers to be biased toward predicting Normal, inflating accuracy metrics while underperforming on pathological detection.`
-                : `Abnormal cases outnumber Normal by ${(abnormal / normal).toFixed(2)}×. Consider oversampling Normal cases or applying class-weight adjustments during training.`
-          }`,
-          `<strong>Standard Deviation:</strong> A standard deviation of <strong>${sd.toFixed(4)}</strong> on binary labels (0 = Normal, 1 = Abnormal) directly reflects the minority-class proportion. A value near 0.5 indicates a balanced dataset; values further from 0.5 signal imbalance.`,
-          `<strong>Clinical Note:</strong> High Abnormal ratios in ECG datasets may reflect deliberate clinical sampling to capture pathological cases — common in diagnostic ML research. Evaluation should prioritize sensitivity (recall) for Abnormal cases over raw accuracy.`
-        ];
-
-      } else {
-        const classLabels = { 0: 'N (Normal)', 1: 'S (Supraventricular)', 2: 'V (Ventricular)', 3: 'F (Fusion)', 4: 'Q (Unknown)' };
-        const classCounts = {};
-        data.forEach(d => { classCounts[d.class] = (classCounts[d.class] || 0) + 1; });
-        const sorted = Object.entries(classCounts).sort((a, b) => b[1] - a[1]);
-        const [topClass, topCount] = sorted[0];
-        const [bottomClass, bottomCount] = sorted[sorted.length - 1];
-        const classValues = data.map(d => d.class);
-        const sd = stdDev(classValues);
-        const vari = variance(classValues);
-        const indices = classValues.map((_, i) => i);
-        const lr = linearRegression(indices, classValues);
-        const imbalanceRatio = bottomCount > 0 ? (topCount / bottomCount).toFixed(1) : '∞';
-
-        insights = [
-          `<strong>Dataset Overview:</strong> This dataset contains <strong>${total.toLocaleString()}</strong> records across ${sorted.length} arrhythmia classes. ${
-            type === 'arrhythmia_combined' ? 'This view combines both the Training and Test splits.' :
-            type === 'arrhythmia_train' ? 'This is the Training split only.' : 'This is the Test split only.'
-          }`,
-          `<strong>Class Dominance:</strong> Class <strong>${classLabels[topClass]}</strong> is the most frequent with <strong>${topCount.toLocaleString()} records (${((topCount/total)*100).toFixed(1)}%)</strong>. Class <strong>${classLabels[bottomClass]}</strong> is the least frequent at <strong>${bottomCount.toLocaleString()} records (${((bottomCount/total)*100).toFixed(1)}%)</strong>.`,
-          `<strong>Class Imbalance:</strong> The imbalance ratio is <strong>${imbalanceRatio}×</strong> (most common vs. least common). ${
-            parseFloat(imbalanceRatio) > 10
-              ? 'This is a severely imbalanced dataset. Techniques like SMOTE, class weighting, or focal loss are strongly recommended to prevent model bias toward majority classes.'
-              : parseFloat(imbalanceRatio) > 3
-                ? 'Moderate imbalance is present. Class-weight adjustments or minority-class oversampling may improve recall on underrepresented arrhythmia types.'
-                : 'The dataset is relatively balanced across classes — standard training pipelines should perform well.'
-          }`,
-          `<strong>Dispersion:</strong> Standard deviation of <strong>${sd.toFixed(4)}</strong> and variance of <strong>${vari.toFixed(4)}</strong> on class labels indicate ${sd > 1 ? 'high spread' : 'moderate spread'} across the 0–4 class spectrum. Higher variance reflects greater class diversity in the dataset.`,
-          `<strong>Trend Analysis (Linear Regression):</strong> Regression of class label against sample index yields a slope of <strong>${lr.slope.toFixed(6)}</strong> with R² = <strong>${lr.r2.toFixed(4)}</strong>. ${
-            lr.r2 < 0.01
-              ? 'The near-zero R² confirms labels are distributed randomly across sample positions — no systematic ordering bias exists, which is ideal for unshuffled training pipelines.'
-              : 'A non-trivial R² suggests some ordering in the data. Shuffling before training is strongly recommended to prevent positional leakage.'
-          }`,
-          `<strong>Clinical Insight:</strong> Dominance of Normal sinus rhythm (Class N) mirrors real-world ECG distributions where most heartbeats are normal. Rare arrhythmia classes (S, V, F, Q) require careful evaluation using F1-score, precision-recall curves, and confusion matrices rather than top-line accuracy alone.`
-        ];
-      }
-
-      box.innerHTML = insights.map(text => `<p>${text}</p>`).join('');
+    function resetArrFilters() {
+      const sel = document.getElementById('arrIdRange');
+      if (sel.options.length > 1) sel.selectedIndex = 1;
+      document.getElementById('arrClassFilter').value = 'all';
+      document.getElementById('arrSort').value = '';
+      applyArrFilters();
     }
 
-    // Initialize on page load
+    // ── Viz ──
+    function switchVizDataset(type, evt) {
+      currentVizDataset = type;
+      document.querySelectorAll('.viz-ds-btn').forEach(b => b.classList.remove('active'));
+      evt.target.classList.add('active');
+      renderViz(type);
+    }
+    function getVizData(type) {
+      if (type==='arrhythmia_combined') return arrhythmiaCombinedData;
+      if (type==='arrhythmia_train')    return arrhythmiaTrainData;
+      if (type==='arrhythmia_test')     return arrhythmiaTestData;
+      if (type==='ecg')                 return ecgData;
+      return [];
+    }
+    function renderViz(type) {
+      const data = getVizData(type);
+      if (!data.length) {
+        document.getElementById('statsTableBody').innerHTML='<tr><td colspan="3" style="text-align:center;padding:32px;color:var(--muted)">No data loaded. Ensure CSV files are accessible.</td></tr>';
+        document.getElementById('insightsBox').innerHTML='<p style="color:var(--muted)">No data loaded.</p>';
+        return;
+      }
+      drawBarChart(data,type); drawDoughnut(data,type); drawScatterPlot(data,type);
+      renderAnalysis(data,type); renderInsights(data,type);
+    }
+
+    const C = ['#0A5B96','#0D7A5F','#92400E','#5B21B6','#9D174D','#065F46'];
+
+    function drawBarChart(data, type) {
+      if (barChartInstance) { barChartInstance.destroy(); barChartInstance=null; }
+      const CL={0:'N — Normal',1:'S — Supraventricular',2:'V — Ventricular',3:'F — Fusion',4:'Q — Unknown'};
+      let labels,counts;
+      if (type==='ecg') {
+        labels=['Normal','Abnormal'];
+        counts=[data.filter(d=>d.status==='Normal').length,data.filter(d=>d.status==='Abnormal').length];
+      } else {
+        const cc={}; data.forEach(d=>{cc[d.class]=(cc[d.class]||0)+1;});
+        const s=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        labels=s.map(([k])=>CL[k]||'Class '+k); counts=s.map(([,v])=>v);
+      }
+      barChartInstance = new Chart(document.getElementById('barChart').getContext('2d'), {
+        type:'bar',
+        data:{labels,datasets:[{label:'Count',data:counts,backgroundColor:C.slice(0,labels.length),borderWidth:0,borderRadius:3}]},
+        options:{
+          indexAxis:'y',responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+c.parsed.x.toLocaleString()+' records'}}},
+          scales:{
+            x:{beginAtZero:true,ticks:{color:'#9CA3AF',font:{family:'DM Mono',size:10},callback:v=>v.toLocaleString()},grid:{color:'#F3F4F6'},border:{display:false}},
+            y:{ticks:{color:'#374151',font:{family:'DM Sans',size:11}},grid:{display:false},border:{display:false}}
+          }
+        }
+      });
+    }
+
+    function drawDoughnut(data, type) {
+      if (doughnutChartInstance) { doughnutChartInstance.destroy(); doughnutChartInstance=null; }
+      const CL={0:'N — Normal',1:'S — Supraventricular',2:'V — Ventricular',3:'F — Fusion',4:'Q — Unknown'};
+      let labels,counts;
+      if (type==='ecg') {
+        labels=['Normal','Abnormal'];
+        counts=[data.filter(d=>d.status==='Normal').length,data.filter(d=>d.status==='Abnormal').length];
+      } else {
+        const cc={}; data.forEach(d=>{cc[d.class]=(cc[d.class]||0)+1;});
+        const s=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+        labels=s.map(([k])=>CL[k]||'Class '+k); counts=s.map(([,v])=>v);
+      }
+      const total=counts.reduce((a,b)=>a+b,0);
+      document.getElementById('doughnutLegend').innerHTML=labels.map((l,i)=>{
+        const pct=total>0?((counts[i]/total)*100).toFixed(1):'0.0';
+        return `<div class="donut-legend-item"><div class="donut-dot" style="background:${C[i%C.length]}"></div>${l} <strong style="color:var(--text);margin-left:2px">(${pct}%)</strong></div>`;
+      }).join('');
+      doughnutChartInstance = new Chart(document.getElementById('doughnutChart').getContext('2d'), {
+        type:'doughnut',
+        data:{labels,datasets:[{data:counts,backgroundColor:C.slice(0,labels.length),borderWidth:2,borderColor:'#fff'}]},
+        options:{
+          responsive:true,maintainAspectRatio:false,cutout:'65%',
+          plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const p=total>0?((c.parsed/total)*100).toFixed(1):'0';return ` ${c.parsed.toLocaleString()} records (${p}%)`}}}}
+        }
+      });
+    }
+
+    function drawScatterPlot(data, type) {
+      if (scatterChartInstance) { scatterChartInstance.destroy(); scatterChartInstance=null; }
+      const ss=Math.min(500,data.length), step=Math.max(1,Math.floor(data.length/ss)), sampled=[];
+      for(let i=0;i<data.length&&sampled.length<ss;i+=step) sampled.push({x:i,y:type==='ecg'?(data[i].status==='Normal'?0:1):data[i].class});
+      const CC={0:'#0A5B96',1:'#0D7A5F',2:'#92400E',3:'#5B21B6',4:'#9D174D'};
+      const YL=type==='ecg'?{0:'Normal',1:'Abnormal'}:{0:'N',1:'S',2:'V',3:'F',4:'Q'};
+      const grp={}; sampled.forEach(p=>{if(!grp[p.y])grp[p.y]=[];grp[p.y].push(p);});
+      const datasets=Object.entries(grp).map(([c,pts])=>({label:YL[c]||'Class '+c,data:pts,backgroundColor:(CC[c]||'#888')+'99',pointRadius:3,pointHoverRadius:5}));
+      const maxY=type==='ecg'?1:4;
+      scatterChartInstance = new Chart(document.getElementById('scatterChart').getContext('2d'), {
+        type:'scatter',data:{datasets},
+        options:{
+          responsive:true,maintainAspectRatio:false,
+          plugins:{legend:{display:true,position:'top',labels:{usePointStyle:true,pointStyle:'circle',font:{family:'DM Sans',size:11},color:'#374151'}}},
+          scales:{
+            x:{title:{display:true,text:'Sample Index',color:'#9CA3AF',font:{size:11}},ticks:{color:'#9CA3AF',font:{family:'DM Mono',size:10}},grid:{color:'#F3F4F6'},border:{display:false}},
+            y:{min:-0.5,max:maxY+0.5,title:{display:true,text:'Class',color:'#9CA3AF',font:{size:11}},ticks:{color:'#9CA3AF',stepSize:1,font:{family:'DM Mono',size:11},callback:v=>YL[v]!==undefined?YL[v]:''},grid:{color:'#F3F4F6'},border:{display:false}}
+          }
+        }
+      });
+    }
+
+    // ── Stats ──
+    function stdDev(v){const n=v.length;if(!n)return 0;const m=v.reduce((a,b)=>a+b,0)/n;return Math.sqrt(v.reduce((s,x)=>s+Math.pow(x-m,2),0)/n);}
+    function variance(v){const n=v.length;if(!n)return 0;const m=v.reduce((a,b)=>a+b,0)/n;return v.reduce((s,x)=>s+Math.pow(x-m,2),0)/n;}
+    function pearsonCorr(xs,ys){const n=xs.length;if(!n)return 0;const mx=xs.reduce((a,b)=>a+b,0)/n,my=ys.reduce((a,b)=>a+b,0)/n;let num=0,dX=0,dY=0;for(let i=0;i<n;i++){const dx=xs[i]-mx,dy=ys[i]-my;num+=dx*dy;dX+=dx*dx;dY+=dy*dy;}const den=Math.sqrt(dX*dY);return den===0?0:num/den;}
+    function linReg(xs,ys){const n=xs.length;if(!n)return{slope:0,intercept:0,r2:0};const mx=xs.reduce((a,b)=>a+b,0)/n,my=ys.reduce((a,b)=>a+b,0)/n;let num=0,den=0;for(let i=0;i<n;i++){num+=(xs[i]-mx)*(ys[i]-my);den+=Math.pow(xs[i]-mx,2);}const slope=den===0?0:num/den,r=pearsonCorr(xs,ys);return{slope,intercept:my-slope*mx,r2:r*r};}
+
+    function renderAnalysis(data, type) {
+      const total=data.length;
+      const cv=type==='ecg'?data.map(d=>d.status==='Normal'?0:1):data.map(d=>d.class);
+      const mean=cv.reduce((a,b)=>a+b,0)/total, sd=stdDev(cv), vari=variance(cv);
+      const idx=cv.map((_,i)=>i), corr=pearsonCorr(idx,cv), lr=linReg(idx,cv);
+      const cc={}; cv.forEach(v=>{cc[v]=(cc[v]||0)+1;});
+      const maxC=Math.max(...Object.values(cc)), minC=Math.min(...Object.values(cc));
+      const ir=minC>0?(maxC/minC).toFixed(2):'N/A';
+      const rows=[
+        {m:'Total Records',           v:total.toLocaleString(),     d:'Number of records in the selected dataset'},
+        {m:'Mean Class Value',        v:mean.toFixed(4),            d:'Average of class / label values'},
+        {m:'Standard Deviation',      v:sd.toFixed(4),              d:'Spread of class values around the mean'},
+        {m:'Variance',                v:vari.toFixed(4),            d:'Squared standard deviation'},
+        {m:'Pearson Correlation',     v:corr.toFixed(4),            d:'Linear correlation: sample position vs class label'},
+        {m:'Regression Slope',        v:lr.slope.toFixed(6),        d:'Rate of class change per sample index unit'},
+        {m:'Regression Intercept',    v:lr.intercept.toFixed(4),    d:'Predicted class value at sample index 0'},
+        {m:'R² (Goodness of Fit)',    v:lr.r2.toFixed(4),           d:'Proportion of class variation explained by index'},
+        {m:'Class Imbalance Ratio',   v:ir.toString(),              d:'Most common : least common class (1.0 = balanced)'},
+        {m:'Unique Classes',          v:Object.keys(cc).length.toString(), d:'Number of distinct class labels'},
+      ];
+      document.getElementById('statsTableBody').innerHTML=rows.map(r=>`
+        <tr>
+          <td style="font-weight:500;color:var(--text)">${r.m}</td>
+          <td class="stats-val">${r.v}</td>
+          <td class="stats-desc">${r.d}</td>
+        </tr>`).join('');
+    }
+
+    function renderInsights(data, type) {
+      const box=document.getElementById('insightsBox'), total=data.length;
+      let insights=[];
+      if (type==='ecg') {
+        const n=data.filter(d=>d.status==='Normal').length, a=data.filter(d=>d.status==='Abnormal').length;
+        const nP=((n/total)*100).toFixed(1), aP=((a/total)*100).toFixed(1);
+        const sd=stdDev(data.map(d=>d.status==='Normal'?0:1));
+        insights=[
+          `<strong>Dataset Overview:</strong> The PTB ECG dataset contains <strong>${total.toLocaleString()}</strong> records — <strong>${n.toLocaleString()} Normal (${nP}%)</strong> and <strong>${a.toLocaleString()} Abnormal (${aP}%)</strong>.`,
+          `<strong>Class Balance:</strong> ${Math.abs(n-a)/total<0.1?'The dataset is relatively balanced between Normal and Abnormal cases, which is favorable for model training.':n>a?`Normal cases outnumber Abnormal by ${(n/a).toFixed(2)}×. This imbalance may bias classifiers toward Normal, inflating accuracy while underperforming on pathological detection.`:`Abnormal cases outnumber Normal by ${(a/n).toFixed(2)}×. Consider oversampling Normal cases or applying class-weight adjustments.`}`,
+          `<strong>Standard Deviation:</strong> A value of <strong>${sd.toFixed(4)}</strong> on binary labels (0=Normal, 1=Abnormal) reflects the minority-class proportion. Values near 0.5 indicate a balanced dataset.`,
+          `<strong>Clinical Note:</strong> High Abnormal ratios in ECG datasets often reflect deliberate clinical sampling. Evaluation should prioritize sensitivity (recall) for Abnormal cases over raw accuracy.`
+        ];
+      } else {
+        const CL={0:'N (Normal)',1:'S (Supraventricular)',2:'V (Ventricular)',3:'F (Fusion)',4:'Q (Unknown)'};
+        const cc={}; data.forEach(d=>{cc[d.class]=(cc[d.class]||0)+1;});
+        const s=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
+        const [tC,tN]=s[0],[bC,bN]=s[s.length-1];
+        const sd=stdDev(data.map(d=>d.class)),vari=variance(data.map(d=>d.class));
+        const idx=data.map((_,i)=>i),lr=linReg(idx,data.map(d=>d.class));
+        const ir=bN>0?(tN/bN).toFixed(1):'∞';
+        insights=[
+          `<strong>Dataset Overview:</strong> ${total.toLocaleString()} records across ${s.length} arrhythmia classes. ${type==='arrhythmia_combined'?'Combines both Training and Test splits.':type==='arrhythmia_train'?'Training split only.':'Test split only.'}`,
+          `<strong>Class Dominance:</strong> <strong>${CL[tC]}</strong> is most frequent — <strong>${tN.toLocaleString()} records (${((tN/total)*100).toFixed(1)}%)</strong>. <strong>${CL[bC]}</strong> is least frequent — <strong>${bN.toLocaleString()} records (${((bN/total)*100).toFixed(1)}%)</strong>.`,
+          `<strong>Class Imbalance:</strong> Imbalance ratio <strong>${ir}×</strong>. ${parseFloat(ir)>10?'Severely imbalanced — SMOTE, class weighting, or focal loss strongly recommended.':parseFloat(ir)>3?'Moderate imbalance — class-weight adjustments or minority oversampling may help.':'Relatively balanced — standard training pipelines should perform well.'}`,
+          `<strong>Dispersion:</strong> Standard deviation <strong>${sd.toFixed(4)}</strong> and variance <strong>${vari.toFixed(4)}</strong> indicate ${sd>1?'high':'moderate'} spread across the class spectrum.`,
+          `<strong>Trend Analysis:</strong> Regression slope <strong>${lr.slope.toFixed(6)}</strong>, R²=<strong>${lr.r2.toFixed(4)}</strong>. ${lr.r2<0.01?'Near-zero R² confirms random label distribution — no positional bias.':'Non-trivial R² suggests ordering. Shuffling before training is recommended.'}`,
+          `<strong>Clinical Insight:</strong> Dominance of Normal sinus rhythm mirrors real-world distributions. Rare arrhythmia classes require F1-score, precision-recall, and confusion matrix evaluation.`
+        ];
+      }
+      box.innerHTML=insights.map(t=>`<p>${t}</p>`).join('');
+    }
+
     document.addEventListener('DOMContentLoaded', loadDataset);
   </script>
-
 </body>
 </html>
