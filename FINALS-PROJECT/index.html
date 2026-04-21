@@ -340,6 +340,61 @@
 
     .pulse { animation: pulse 1.5s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.35} }
+
+    /* PAGINATION */
+    .pagination {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      padding: 14px 16px 10px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      flex-wrap: wrap;
+    }
+    .pg-btn {
+      min-width: 32px;
+      height: 32px;
+      padding: 0 8px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: 'DM Mono', monospace;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: all 0.12s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pg-btn:hover { background: var(--bg); color: var(--text); }
+    .pg-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .pg-btn:disabled { opacity: 0.3; cursor: default; }
+    .pg-btn.pg-arrow { font-size: 16px; color: var(--muted); }
+    .pg-ellipsis {
+      min-width: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      font-family: 'DM Mono', monospace;
+      user-select: none;
+    }
+    .pg-info {
+      margin-left: auto;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+    .pg-active-underline {
+      display: block;
+      width: 100%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 1px;
+      margin-top: 2px;
+    }
   </style>
 </head>
 <body>
@@ -429,6 +484,7 @@
           <thead><tr><th style="width:140px">Record ID</th><th>Clinical Status</th></tr></thead>
           <tbody><tr class="empty-row"><td colspan="2" class="pulse">Loading dataset…</td></tr></tbody>
         </table>
+        <div id="ecgPagination" class="pagination" style="display:none"></div>
       </div>
     </div>
 
@@ -502,6 +558,7 @@
           <thead><tr><th style="width:140px">Record ID</th><th>Dataset Split</th><th>Arrhythmia Class</th></tr></thead>
           <tbody><tr class="empty-row"><td colspan="3" class="pulse">Loading dataset…</td></tr></tbody>
         </table>
+        <div id="arrPagination" class="pagination" style="display:none"></div>
       </div>
     </div>
 
@@ -562,6 +619,11 @@
     let ecgData = [], arrhythmiaTrainData = [], arrhythmiaTestData = [], arrhythmiaCombinedData = [];
     let currentArrhythmiaView = 'combined', currentVizDataset = 'arrhythmia_combined';
     let barChartInstance = null, doughnutChartInstance = null, scatterChartInstance = null;
+
+    // Pagination state
+    const PAGE_SIZE = 100;
+    let ecgPage = 1, arrPage = 1;
+    let ecgFiltered = [], arrFiltered = [];
 
     async function loadDataset() {
       try {
@@ -639,7 +701,7 @@
       applyECGFilters();
     }
 
-    function applyECGFilters() {
+    function applyECGFilters(resetPage) {
       const rng = document.getElementById('ecgIdRange').value;
       const sts = document.getElementById('ecgStatusFilter').value;
       const srt = document.getElementById('ecgSort').value;
@@ -650,17 +712,29 @@
       if (srt==='id')     f.sort((a,b)=>a.id-b.id);
       if (srt==='status') f.sort((a,b)=>a.status.localeCompare(b.status));
 
+      ecgFiltered = f;
+      if (resetPage !== false) ecgPage = 1;
+
+      const isAll = (rng === 'all' && sts === 'all');
+      const needsPaging = f.length > PAGE_SIZE;
+
       document.getElementById('ecgFilterCount').textContent = `${f.length.toLocaleString()} of ${ecgData.length.toLocaleString()} records`;
+
+      const display = needsPaging ? f.slice((ecgPage-1)*PAGE_SIZE, ecgPage*PAGE_SIZE) : f;
 
       const tbody = document.querySelector('#ecgTable tbody');
       tbody.innerHTML = '';
-      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="2">No records match the selected filters.</td></tr>'; return; }
-      f.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
-          <td><span class="badge badge-${row.status.toLowerCase()}">${row.status}</span></td>`;
-        tbody.appendChild(tr);
-      });
+      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="2">No records match the selected filters.</td></tr>'; }
+      else {
+        display.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+            <td><span class="badge badge-${row.status.toLowerCase()}">${row.status}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      renderPagination('ecg', f.length, ecgPage, needsPaging);
     }
 
     function resetECGFilters() {
@@ -668,6 +742,7 @@
       if (sel.options.length > 1) sel.selectedIndex = 1;
       document.getElementById('ecgStatusFilter').value = 'all';
       document.getElementById('ecgSort').value = '';
+      ecgPage = 1;
       applyECGFilters();
     }
 
@@ -679,7 +754,7 @@
       applyArrFilters();
     }
 
-    function applyArrFilters() {
+    function applyArrFilters(resetPage) {
       const rng = document.getElementById('arrIdRange').value;
       const cls = document.getElementById('arrClassFilter').value;
       const srt = document.getElementById('arrSort').value;
@@ -690,6 +765,11 @@
       if (cls !== 'all') f = f.filter(r=>r.class===parseInt(cls));
       if (srt==='id')    f.sort((a,b)=>a.id-b.id);
       if (srt==='class') f.sort((a,b)=>a.class-b.class);
+
+      arrFiltered = f;
+      if (resetPage !== false) arrPage = 1;
+
+      const needsPaging = f.length > PAGE_SIZE;
 
       document.getElementById('arrFilterCount').textContent = `${f.length.toLocaleString()} of ${src.length.toLocaleString()} records`;
 
@@ -702,15 +782,22 @@
       };
       const tbody = document.querySelector('#arrTable tbody');
       tbody.innerHTML = '';
-      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="3">No records match the selected filters.</td></tr>'; return; }
-      f.forEach(row => {
-        const m = meta[row.class]||{label:'Unknown',badge:'badge-q'};
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
-          <td><span class="badge badge-${row.dataset==='Training'?'train':'test'}">${row.dataset}</span></td>
-          <td><span class="badge ${m.badge}">${m.label}</span></td>`;
-        tbody.appendChild(tr);
-      });
+
+      if (f.length===0) {
+        tbody.innerHTML='<tr class="empty-row"><td colspan="3">No records match the selected filters.</td></tr>';
+      } else {
+        const display = needsPaging ? f.slice((arrPage-1)*PAGE_SIZE, arrPage*PAGE_SIZE) : f;
+        display.forEach(row => {
+          const m = meta[row.class]||{label:'Unknown',badge:'badge-q'};
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+            <td><span class="badge badge-${row.dataset==='Training'?'train':'test'}">${row.dataset}</span></td>
+            <td><span class="badge ${m.badge}">${m.label}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      renderPagination('arr', f.length, arrPage, needsPaging);
     }
 
     function resetArrFilters() {
@@ -718,7 +805,64 @@
       if (sel.options.length > 1) sel.selectedIndex = 1;
       document.getElementById('arrClassFilter').value = 'all';
       document.getElementById('arrSort').value = '';
+      arrPage = 1;
       applyArrFilters();
+    }
+
+    // ── Pagination renderer ──
+    function renderPagination(which, total, currentPage, show) {
+      const el = document.getElementById(which + 'Pagination');
+      if (!show || total === 0) { el.style.display = 'none'; el.innerHTML = ''; return; }
+      el.style.display = 'flex';
+
+      const totalPages = Math.ceil(total / PAGE_SIZE);
+      const startRec = (currentPage - 1) * PAGE_SIZE + 1;
+      const endRec = Math.min(currentPage * PAGE_SIZE, total);
+
+      // Build page numbers with ellipsis: always show first, last, current ±2
+      const pages = [];
+      for (let p = 1; p <= totalPages; p++) {
+        if (p === 1 || p === totalPages || (p >= currentPage - 2 && p <= currentPage + 2)) {
+          pages.push(p);
+        }
+      }
+      // Insert ellipsis markers
+      const withGaps = [];
+      for (let i = 0; i < pages.length; i++) {
+        if (i > 0 && pages[i] - pages[i-1] > 1) withGaps.push('…');
+        withGaps.push(pages[i]);
+      }
+
+      let html = '';
+      // Prev arrow
+      html += `<button class="pg-btn pg-arrow" ${currentPage===1?'disabled':''} onclick="goPage('${which}',${currentPage-1})">‹</button>`;
+      // Page numbers
+      withGaps.forEach(p => {
+        if (p === '…') {
+          html += `<span class="pg-ellipsis">…</span>`;
+        } else {
+          const active = p === currentPage ? ' active' : '';
+          html += `<button class="pg-btn${active}" onclick="goPage('${which}',${p})">${p}</button>`;
+        }
+      });
+      // Next arrow
+      html += `<button class="pg-btn pg-arrow" ${currentPage===totalPages?'disabled':''} onclick="goPage('${which}',${currentPage+1})">›</button>`;
+      // Info
+      html += `<span class="pg-info">${startRec.toLocaleString()}–${endRec.toLocaleString()} of ${total.toLocaleString()}</span>`;
+
+      el.innerHTML = html;
+    }
+
+    function goPage(which, page) {
+      if (which === 'ecg') {
+        ecgPage = page;
+        applyECGFilters(false);
+      } else {
+        arrPage = page;
+        applyArrFilters(false);
+      }
+      // Scroll table into view smoothly
+      document.getElementById(which === 'ecg' ? 'ecgTable' : 'arrTable').closest('.table-wrap').scrollIntoView({behavior:'smooth', block:'start'});
     }
 
     // ── Viz ──
