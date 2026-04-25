@@ -590,9 +590,10 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Class vs. Sample Index</div>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Sampled 500 records — visualizes class spread across dataset positions.</p>
-        <div style="position:relative;width:100%;height:260px;"><canvas id="scatterChart"></canvas></div>
+        <div class="card-title">Class Imbalance — Proportional Breakdown</div>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:16px;">Stacked percentage bars showing class share across all dataset splits. Highlights severity of class imbalance at a glance.</p>
+        <div id="stackedLegend" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+        <div id="stackedBarsContainer" style="display:flex;flex-direction:column;gap:14px;"></div>
       </div>
 
       <div class="card">
@@ -618,7 +619,7 @@
   <script>
     let ecgData = [], arrhythmiaTrainData = [], arrhythmiaTestData = [], arrhythmiaCombinedData = [];
     let currentArrhythmiaView = 'combined', currentVizDataset = 'arrhythmia_combined';
-    let barChartInstance = null, doughnutChartInstance = null, scatterChartInstance = null;
+    let barChartInstance = null, doughnutChartInstance = null;
 
     // Pagination state
     const PAGE_SIZE = 100;
@@ -886,7 +887,7 @@
         document.getElementById('insightsBox').innerHTML='<p style="color:var(--muted)">No data loaded.</p>';
         return;
       }
-      drawBarChart(data,type); drawDoughnut(data,type); drawScatterPlot(data,type);
+      drawBarChart(data,type); drawDoughnut(data,type); drawStackedProportions(type);
       renderAnalysis(data,type); renderInsights(data,type);
     }
 
@@ -945,25 +946,81 @@
       });
     }
 
-    function drawScatterPlot(data, type) {
-      if (scatterChartInstance) { scatterChartInstance.destroy(); scatterChartInstance=null; }
-      const ss=Math.min(500,data.length), step=Math.max(1,Math.floor(data.length/ss)), sampled=[];
-      for(let i=0;i<data.length&&sampled.length<ss;i+=step) sampled.push({x:i,y:type==='ecg'?(data[i].status==='Normal'?0:1):data[i].class});
-      const CC={0:'#0A5B96',1:'#0D7A5F',2:'#92400E',3:'#5B21B6',4:'#9D174D'};
-      const YL=type==='ecg'?{0:'Normal',1:'Abnormal'}:{0:'N',1:'S',2:'V',3:'F',4:'Q'};
-      const grp={}; sampled.forEach(p=>{if(!grp[p.y])grp[p.y]=[];grp[p.y].push(p);});
-      const datasets=Object.entries(grp).map(([c,pts])=>({label:YL[c]||'Class '+c,data:pts,backgroundColor:(CC[c]||'#888')+'99',pointRadius:3,pointHoverRadius:5}));
-      const maxY=type==='ecg'?1:4;
-      scatterChartInstance = new Chart(document.getElementById('scatterChart').getContext('2d'), {
-        type:'scatter',data:{datasets},
-        options:{
-          responsive:true,maintainAspectRatio:false,
-          plugins:{legend:{display:true,position:'top',labels:{usePointStyle:true,pointStyle:'circle',font:{family:'DM Sans',size:11},color:'#374151'}}},
-          scales:{
-            x:{title:{display:true,text:'Sample Index',color:'#9CA3AF',font:{size:11}},ticks:{color:'#9CA3AF',font:{family:'DM Mono',size:10}},grid:{color:'#F3F4F6'},border:{display:false}},
-            y:{min:-0.5,max:maxY+0.5,title:{display:true,text:'Class',color:'#9CA3AF',font:{size:11}},ticks:{color:'#9CA3AF',stepSize:1,font:{family:'DM Mono',size:11},callback:v=>YL[v]!==undefined?YL[v]:''},grid:{color:'#F3F4F6'},border:{display:false}}
-          }
-        }
+    function drawStackedProportions(activeType) {
+      // Build rows for all datasets so user can compare splits
+      const datasets = [
+        { label: 'Arrhythmia — Combined', data: arrhythmiaCombinedData, type: 'arr' },
+        { label: 'Arrhythmia — Training',  data: arrhythmiaTrainData,    type: 'arr' },
+        { label: 'Arrhythmia — Test',      data: arrhythmiaTestData,     type: 'arr' },
+        { label: 'ECG — PTB',              data: ecgData,                type: 'ecg' },
+      ];
+
+      // Classes
+      const arrClasses = [
+        { key: 0, label: 'N — Normal',          color: '#0A5B96' },
+        { key: 1, label: 'S — Supraventricular', color: '#5B21B6' },
+        { key: 2, label: 'V — Ventricular',      color: '#92400E' },
+        { key: 3, label: 'F — Fusion',            color: '#9D174D' },
+        { key: 4, label: 'Q — Unknown',           color: '#374151' },
+      ];
+      const ecgClasses = [
+        { key: 'Normal',   label: 'Normal',   color: '#0D7A5F' },
+        { key: 'Abnormal', label: 'Abnormal', color: '#B91C1C' },
+      ];
+
+      // Legend — show arr classes + ecg classes
+      const legendContainer = document.getElementById('stackedLegend');
+      const allLegend = [...arrClasses, ...ecgClasses];
+      legendContainer.innerHTML = allLegend.map(c =>
+        `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6B7280;">
+          <div style="width:10px;height:10px;border-radius:2px;background:${c.color};flex-shrink:0;"></div>
+          ${c.label}
+        </div>`
+      ).join('');
+
+      const container = document.getElementById('stackedBarsContainer');
+      container.innerHTML = '';
+
+      datasets.forEach(ds => {
+        if (!ds.data.length) return;
+        const total = ds.data.length;
+        const classes = ds.type === 'arr' ? arrClasses : ecgClasses;
+
+        // Count per class
+        const counts = classes.map(c => {
+          if (ds.type === 'arr') return { ...c, count: ds.data.filter(d => d.class === c.key).length };
+          else return { ...c, count: ds.data.filter(d => d.status === c.key).length };
+        });
+
+        // Build segments HTML
+        const segments = counts.map(c => {
+          const pct = (c.count / total * 100);
+          if (pct < 0.05) return '';
+          const label = pct >= 5 ? `${pct.toFixed(1)}%` : '';
+          return `<div style="width:${pct}%;background:${c.color};height:100%;display:flex;align-items:center;justify-content:center;min-width:2px;overflow:hidden;transition:width 0.4s ease;"
+            title="${c.label}: ${c.count.toLocaleString()} records (${pct.toFixed(2)}%)">
+            <span style="font-size:10px;color:#fff;font-family:'DM Mono',monospace;white-space:nowrap;padding:0 3px;">${label}</span>
+          </div>`;
+        }).join('');
+
+        // Highlight active dataset with a left accent
+        const isActive = (activeType === 'arrhythmia_combined' && ds.label.includes('Combined')) ||
+                         (activeType === 'arrhythmia_train' && ds.label.includes('Training')) ||
+                         (activeType === 'arrhythmia_test' && ds.label.includes('Test')) ||
+                         (activeType === 'ecg' && ds.label.includes('ECG'));
+        const activeStyle = isActive ? 'border-left:3px solid var(--accent);padding-left:10px;' : 'padding-left:13px;';
+
+        const row = document.createElement('div');
+        row.style.cssText = activeStyle;
+        row.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:${isActive?'600':'400'};color:${isActive?'var(--text)':'#6B7280'};">${ds.label}</span>
+            <span style="font-size:10px;font-family:'DM Mono',monospace;color:#9CA3AF;">${total.toLocaleString()} records</span>
+          </div>
+          <div style="display:flex;width:100%;height:28px;border-radius:4px;overflow:hidden;background:#F3F4F6;">
+            ${segments}
+          </div>`;
+        container.appendChild(row);
       });
     }
 
