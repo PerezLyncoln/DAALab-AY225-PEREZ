@@ -329,10 +329,71 @@
     .stats-val  { font-family:'DM Mono',monospace; color:var(--accent); font-size:12px; }
     .stats-desc { color:var(--muted); font-size:11px; }
 
-    .insights-box { font-size:13px; color:#374151; line-height:1.75; }
-    .insights-box p { margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border); }
-    .insights-box p:last-child { border-bottom:none; margin-bottom:0; padding-bottom:0; }
-    .insights-box strong { color:var(--text); font-weight:600; }
+    /* INSIGHT CARDS */
+    .insight-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    @media(max-width:680px){ .insight-grid { grid-template-columns:1fr; } }
+    .insight-card {
+      border-radius:8px;
+      border:1px solid var(--border);
+      overflow:hidden;
+      background:var(--surface);
+      display:flex;
+      flex-direction:column;
+    }
+    .insight-card-head {
+      display:flex; align-items:center; gap:10px;
+      padding:12px 16px;
+      border-bottom:1px solid var(--border);
+    }
+    .insight-icon {
+      width:32px; height:32px; border-radius:7px;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+    }
+    .insight-icon svg { width:15px; height:15px; }
+    .insight-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; }
+    .insight-card-body { padding:14px 16px; flex:1; }
+    .insight-text { font-size:12.5px; color:#374151; line-height:1.65; }
+    .insight-text strong { color:var(--text); font-weight:600; }
+
+    /* severity badge */
+    .sev-badge {
+      display:inline-flex; align-items:center; gap:5px;
+      padding:2px 8px; border-radius:20px;
+      font-size:10px; font-weight:700; letter-spacing:0.4px;
+      margin-left:auto; flex-shrink:0;
+    }
+    .sev-ok   { background:var(--normal-lt);   color:var(--normal); }
+    .sev-warn { background:var(--warn-lt);      color:var(--warn); }
+    .sev-bad  { background:var(--abnormal-lt);  color:var(--abnormal); }
+    .sev-info { background:var(--accent-lt);    color:var(--accent); }
+
+    /* mini spark bar */
+    .mini-bars { display:flex; align-items:flex-end; gap:2px; height:36px; margin-top:10px; }
+    .mini-bar  { flex:1; border-radius:2px 2px 0 0; min-height:3px; transition:height 0.4s; }
+
+    /* mini gauge */
+    .mini-gauge { position:relative; width:64px; height:32px; margin-top:8px; flex-shrink:0; }
+    .mini-gauge svg { overflow:visible; }
+
+    /* inline stat row */
+    .inline-stats { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+    .istat { display:flex; flex-direction:column; align-items:center; background:var(--bg); border-radius:6px; padding:7px 12px; min-width:60px; }
+    .istat-val { font-size:16px; font-weight:600; font-family:'DM Mono',monospace; letter-spacing:-0.5px; }
+    .istat-lbl { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:0.6px; margin-top:2px; }
+
+    /* wide card spanning both columns */
+    .insight-card.wide { grid-column: 1 / -1; }
+
+    /* recommendation chips */
+    .chip-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .chip {
+      padding:4px 10px; border-radius:20px; font-size:11px; font-weight:500;
+      background:var(--accent-lt); color:var(--accent); border:1px solid #C8DFF5;
+    }
+    .chip.chip-warn { background:var(--warn-lt); color:var(--warn); border-color:#F9C87A; }
+    .chip.chip-bad  { background:var(--abnormal-lt); color:var(--abnormal); border-color:#FECACA; }
+    .chip.chip-ok   { background:var(--normal-lt); color:var(--normal); border-color:#A7F3D0; }
 
     .donut-legend { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
     .donut-legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
@@ -608,8 +669,8 @@
 
       <div class="card">
         <div class="card-title">Narrative Insights</div>
-        <div class="insights-box" id="insightsBox">
-          <p class="pulse" style="color:var(--muted)">Loading insights…</p>
+        <div id="insightsBox">
+          <p class="pulse" style="color:var(--muted);font-size:13px;">Loading insights…</p>
         </div>
       </div>
     </div>
@@ -1059,36 +1120,277 @@
     }
 
     function renderInsights(data, type) {
-      const box=document.getElementById('insightsBox'), total=data.length;
-      let insights=[];
-      if (type==='ecg') {
-        const n=data.filter(d=>d.status==='Normal').length, a=data.filter(d=>d.status==='Abnormal').length;
-        const nP=((n/total)*100).toFixed(1), aP=((a/total)*100).toFixed(1);
-        const sd=stdDev(data.map(d=>d.status==='Normal'?0:1));
-        insights=[
-          `<strong>Dataset Overview:</strong> The PTB ECG dataset contains <strong>${total.toLocaleString()}</strong> records — <strong>${n.toLocaleString()} Normal (${nP}%)</strong> and <strong>${a.toLocaleString()} Abnormal (${aP}%)</strong>.`,
-          `<strong>Class Balance:</strong> ${Math.abs(n-a)/total<0.1?'The dataset is relatively balanced between Normal and Abnormal cases, which is favorable for model training.':n>a?`Normal cases outnumber Abnormal by ${(n/a).toFixed(2)}×. This imbalance may bias classifiers toward Normal, inflating accuracy while underperforming on pathological detection.`:`Abnormal cases outnumber Normal by ${(a/n).toFixed(2)}×. Consider oversampling Normal cases or applying class-weight adjustments.`}`,
-          `<strong>Standard Deviation:</strong> A value of <strong>${sd.toFixed(4)}</strong> on binary labels (0=Normal, 1=Abnormal) reflects the minority-class proportion. Values near 0.5 indicate a balanced dataset.`,
-          `<strong>Clinical Note:</strong> High Abnormal ratios in ECG datasets often reflect deliberate clinical sampling. Evaluation should prioritize sensitivity (recall) for Abnormal cases over raw accuracy.`
-        ];
-      } else {
-        const CL={0:'N (Normal)',1:'S (Supraventricular)',2:'V (Ventricular)',3:'F (Fusion)',4:'Q (Unknown)'};
-        const cc={}; data.forEach(d=>{cc[d.class]=(cc[d.class]||0)+1;});
-        const s=Object.entries(cc).sort((a,b)=>b[1]-a[1]);
-        const [tC,tN]=s[0],[bC,bN]=s[s.length-1];
-        const sd=stdDev(data.map(d=>d.class)),vari=variance(data.map(d=>d.class));
-        const idx=data.map((_,i)=>i),lr=linReg(idx,data.map(d=>d.class));
-        const ir=bN>0?(tN/bN).toFixed(1):'∞';
-        insights=[
-          `<strong>Dataset Overview:</strong> ${total.toLocaleString()} records across ${s.length} arrhythmia classes. ${type==='arrhythmia_combined'?'Combines both Training and Test splits.':type==='arrhythmia_train'?'Training split only.':'Test split only.'}`,
-          `<strong>Class Dominance:</strong> <strong>${CL[tC]}</strong> is most frequent — <strong>${tN.toLocaleString()} records (${((tN/total)*100).toFixed(1)}%)</strong>. <strong>${CL[bC]}</strong> is least frequent — <strong>${bN.toLocaleString()} records (${((bN/total)*100).toFixed(1)}%)</strong>.`,
-          `<strong>Class Imbalance:</strong> Imbalance ratio <strong>${ir}×</strong>. ${parseFloat(ir)>10?'Severely imbalanced — SMOTE, class weighting, or focal loss strongly recommended.':parseFloat(ir)>3?'Moderate imbalance — class-weight adjustments or minority oversampling may help.':'Relatively balanced — standard training pipelines should perform well.'}`,
-          `<strong>Dispersion:</strong> Standard deviation <strong>${sd.toFixed(4)}</strong> and variance <strong>${vari.toFixed(4)}</strong> indicate ${sd>1?'high':'moderate'} spread across the class spectrum.`,
-          `<strong>Trend Analysis:</strong> Regression slope <strong>${lr.slope.toFixed(6)}</strong>, R²=<strong>${lr.r2.toFixed(4)}</strong>. ${lr.r2<0.01?'Near-zero R² confirms random label distribution — no positional bias.':'Non-trivial R² suggests ordering. Shuffling before training is recommended.'}`,
-          `<strong>Clinical Insight:</strong> Dominance of Normal sinus rhythm mirrors real-world distributions. Rare arrhythmia classes require F1-score, precision-recall, and confusion matrix evaluation.`
-        ];
+      const box = document.getElementById('insightsBox');
+      const total = data.length;
+
+      // ── SVG icon helpers ──
+      const icons = {
+        overview: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor"/><rect x="6" y="5" width="3" height="10" rx="1" fill="currentColor"/><rect x="11" y="1" width="3" height="14" rx="1" fill="currentColor"/></svg>`,
+        balance: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v12M4 7l4-5 4 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 14h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+        dispersion: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="8" cy="7" r="1.5" fill="currentColor"/><circle cx="12" cy="4" r="1.5" fill="currentColor"/><path d="M1 15 L15 1" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2" opacity="0.4"/></svg>`,
+        trend: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 13 L5 8 L9 10 L15 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+        clinical: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1a5 5 0 100 10A5 5 0 008 1z" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v3l2 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 11v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+        recommend: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 8l3.5 3.5L13 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+      };
+
+      function iconBox(icon, bg, color) {
+        return `<div class="insight-icon" style="background:${bg};color:${color};">${icons[icon]}</div>`;
       }
-      box.innerHTML=insights.map(t=>`<p>${t}</p>`).join('');
+
+      function miniBarsSVG(labels, values, colors) {
+        const max = Math.max(...values) || 1;
+        return `<div class="mini-bars">` +
+          values.map((v, i) => {
+            const pct = Math.round((v / max) * 100);
+            return `<div class="mini-bar" style="height:${Math.max(pct,4)}%;background:${colors[i % colors.length]};" title="${labels[i]}: ${v.toLocaleString()}"></div>`;
+          }).join('') +
+        `</div>`;
+      }
+
+      function gaugeArc(ratio) {
+        // ratio 0–1, half-circle gauge
+        const r = 28, cx = 32, cy = 32;
+        const angle = Math.PI * ratio;
+        const x = cx - r * Math.cos(angle);
+        const y = cy - r * Math.sin(angle);
+        const large = ratio > 0.5 ? 1 : 0;
+        const color = ratio < 0.4 ? '#0D7A5F' : ratio < 0.7 ? '#92400E' : '#B91C1C';
+        return `<svg width="64" height="34" viewBox="0 4 64 32">
+          <path d="M4,32 A28,28 0 0,1 60,32" fill="none" stroke="#E5E7EB" stroke-width="6" stroke-linecap="round"/>
+          <path d="M4,32 A28,28 0 ${large},1 ${x.toFixed(1)},${y.toFixed(1)}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round"/>
+        </svg>`;
+      }
+
+      let html = '';
+
+      if (type === 'ecg') {
+        const n = data.filter(d => d.status === 'Normal').length;
+        const a = data.filter(d => d.status === 'Abnormal').length;
+        const nP = ((n / total) * 100).toFixed(1);
+        const aP = ((a / total) * 100).toFixed(1);
+        const sd = stdDev(data.map(d => d.status === 'Normal' ? 0 : 1));
+        const ratio = a / total;
+        const balanced = Math.abs(n - a) / total < 0.1;
+        const dominantLabel = n > a ? 'Normal' : 'Abnormal';
+        const imbalanceRatio = n > a ? (n / a).toFixed(2) : (a / n).toFixed(2);
+        const sevClass = balanced ? 'sev-ok' : (parseFloat(imbalanceRatio) > 2 ? 'sev-bad' : 'sev-warn');
+        const sevLabel = balanced ? 'Balanced' : (parseFloat(imbalanceRatio) > 2 ? 'Imbalanced' : 'Mild Imbalance');
+
+        html = `<div class="insight-grid">
+
+          <!-- Overview -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('overview','var(--accent-lt)','var(--accent)')}
+              <span class="insight-label" style="color:var(--accent)">Dataset Overview</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">PTB ECG dataset with <strong>${total.toLocaleString()}</strong> total records split across two clinical categories.</p>
+              <div class="inline-stats">
+                <div class="istat"><span class="istat-val" style="color:var(--normal)">${n.toLocaleString()}</span><span class="istat-lbl">Normal</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--abnormal)">${a.toLocaleString()}</span><span class="istat-lbl">Abnormal</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--accent)">${total.toLocaleString()}</span><span class="istat-lbl">Total</span></div>
+              </div>
+              ${miniBarsSVG(['Normal','Abnormal'],[n,a],['#0D7A5F','#B91C1C'])}
+            </div>
+          </div>
+
+          <!-- Class Balance -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('balance', balanced?'var(--normal-lt)':'var(--abnormal-lt)', balanced?'var(--normal)':'var(--abnormal)')}
+              <span class="insight-label" style="color:${balanced?'var(--normal)':'var(--abnormal)'}">Class Balance</span>
+              <span class="sev-badge ${sevClass}" style="margin-left:auto;">${sevLabel}</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">${balanced
+                ? 'The dataset is <strong>relatively balanced</strong> between Normal and Abnormal — favorable for standard model training.'
+                : `<strong>${dominantLabel}</strong> cases outnumber the other by <strong>${imbalanceRatio}×</strong>. This may bias classifiers, inflating accuracy while underperforming on minority detection.`}
+              </p>
+              <div style="display:flex;align-items:center;gap:16px;margin-top:10px;">
+                <div>
+                  <div style="height:8px;border-radius:4px;background:#E5E7EB;overflow:hidden;width:180px;">
+                    <div style="height:100%;width:${nP}%;background:var(--normal);border-radius:4px;"></div>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:3px;width:180px;">
+                    <span>Normal ${nP}%</span><span>Abnormal ${aP}%</span>
+                  </div>
+                </div>
+                <div class="mini-gauge">${gaugeArc(ratio)}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Std Deviation -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('dispersion','var(--purple-lt)','var(--purple)')}
+              <span class="insight-label" style="color:var(--purple)">Standard Deviation</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">SD of <strong>${sd.toFixed(4)}</strong> on binary labels reflects the minority-class proportion. Values near <strong>0.5</strong> indicate a balanced dataset.</p>
+              <div class="inline-stats" style="margin-top:10px;">
+                <div class="istat"><span class="istat-val" style="color:var(--purple)">${sd.toFixed(4)}</span><span class="istat-lbl">Std Dev</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--muted)">${(sd*sd).toFixed(4)}</span><span class="istat-lbl">Variance</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--muted)">0.5000</span><span class="istat-lbl">Ideal</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clinical Note -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('clinical','var(--warn-lt)','var(--warn)')}
+              <span class="insight-label" style="color:var(--warn)">Clinical Note</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">High Abnormal ratios in ECG datasets often reflect <strong>deliberate clinical sampling</strong>. Evaluation must prioritize <strong>sensitivity (recall)</strong> for Abnormal cases over raw accuracy.</p>
+              <div class="chip-row">
+                <span class="chip chip-warn">Prioritize Recall</span>
+                <span class="chip chip-warn">Sensitivity > Accuracy</span>
+                <span class="chip">F1-Score</span>
+                <span class="chip">Confusion Matrix</span>
+              </div>
+            </div>
+          </div>
+
+        </div>`;
+
+      } else {
+        const CL = { 0:'N (Normal)', 1:'S (Supraventricular)', 2:'V (Ventricular)', 3:'F (Fusion)', 4:'Q (Unknown)' };
+        const CLshort = { 0:'Normal', 1:'Supra.', 2:'Ventri.', 3:'Fusion', 4:'Unknown' };
+        const colors = ['#0A5B96','#5B21B6','#92400E','#9D174D','#374151'];
+        const cc = {}; data.forEach(d => { cc[d.class] = (cc[d.class] || 0) + 1; });
+        const s = Object.entries(cc).sort((a, b) => b[1] - a[1]);
+        const [tC, tN] = s[0], [bC, bN] = s[s.length - 1];
+        const tPct = ((tN / total) * 100).toFixed(1);
+        const bPct = ((bN / total) * 100).toFixed(1);
+        const sd = stdDev(data.map(d => d.class));
+        const vari = variance(data.map(d => d.class));
+        const idx = data.map((_, i) => i);
+        const lr = linReg(idx, data.map(d => d.class));
+        const ir = bN > 0 ? (tN / bN).toFixed(1) : '∞';
+        const irNum = parseFloat(ir);
+        const sevClass = irNum > 10 ? 'sev-bad' : irNum > 3 ? 'sev-warn' : 'sev-ok';
+        const sevLabel = irNum > 10 ? 'Severe' : irNum > 3 ? 'Moderate' : 'Balanced';
+        const splitLabel = type === 'arrhythmia_combined' ? 'Combined (Train + Test)' : type === 'arrhythmia_train' ? 'Training Split' : 'Test Split';
+
+        // build bar arrays in class order
+        const barLabels = s.map(([k]) => CLshort[k]);
+        const barValues = s.map(([, v]) => v);
+        const barColors = s.map(([k]) => colors[k] || '#888');
+
+        html = `<div class="insight-grid">
+
+          <!-- Overview -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('overview','var(--accent-lt)','var(--accent)')}
+              <span class="insight-label" style="color:var(--accent)">Dataset Overview</span>
+              <span class="sev-badge sev-info" style="margin-left:auto;">${splitLabel}</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text"><strong>${total.toLocaleString()}</strong> records across <strong>${s.length}</strong> arrhythmia classes.</p>
+              <div class="inline-stats">
+                ${s.map(([k, v]) => `<div class="istat"><span class="istat-val" style="color:${colors[k]||'#888'}">${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}</span><span class="istat-lbl">${CLshort[k]||'C'+k}</span></div>`).join('')}
+              </div>
+              ${miniBarsSVG(barLabels, barValues, barColors)}
+            </div>
+          </div>
+
+          <!-- Class Dominance -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('balance','var(--abnormal-lt)','var(--abnormal)')}
+              <span class="insight-label" style="color:var(--abnormal)">Class Dominance</span>
+              <span class="sev-badge ${sevClass}" style="margin-left:auto;">${sevLabel} · ${ir}×</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">
+                <strong>${CL[tC]}</strong> dominates with <strong>${tN.toLocaleString()} records (${tPct}%)</strong>.
+                <strong>${CL[bC]}</strong> is the rarest — <strong>${bN.toLocaleString()} records (${bPct}%)</strong>.
+              </p>
+              <div style="margin-top:10px;display:flex;flex-direction:column;gap:5px;">
+                ${s.map(([k, v]) => {
+                  const pct = (v / total * 100).toFixed(1);
+                  return `<div>
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:2px;">
+                      <span>${CLshort[k]||'C'+k}</span><span>${pct}%</span>
+                    </div>
+                    <div style="height:6px;border-radius:3px;background:#E5E7EB;overflow:hidden;">
+                      <div style="height:100%;width:${pct}%;background:${colors[k]||'#888'};border-radius:3px;"></div>
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Class Imbalance -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('dispersion','var(--warn-lt)','var(--warn)')}
+              <span class="insight-label" style="color:var(--warn)">Class Imbalance</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">Imbalance ratio of <strong>${ir}×</strong>. ${irNum > 10
+                ? 'Severely imbalanced — model training will likely overfit to majority class.'
+                : irNum > 3
+                  ? 'Moderate imbalance present — minority classes need special handling.'
+                  : 'Relatively balanced — standard pipelines should perform well.'}</p>
+              <div class="chip-row">
+                ${irNum > 10 ? `<span class="chip chip-bad">SMOTE Oversampling</span><span class="chip chip-bad">Focal Loss</span><span class="chip chip-warn">Class Weighting</span>` : irNum > 3 ? `<span class="chip chip-warn">Class Weighting</span><span class="chip chip-warn">Oversampling</span>` : `<span class="chip chip-ok">Standard Pipeline</span>`}
+                <span class="chip">Precision-Recall AUC</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:16px;margin-top:10px;">
+                <div class="mini-gauge">${gaugeArc(Math.min(irNum / 20, 1))}</div>
+                <div style="font-size:11px;color:var(--muted);">Imbalance severity<br><strong style="color:${irNum>10?'var(--abnormal)':irNum>3?'var(--warn)':'var(--normal)'};">${sevLabel}</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dispersion -->
+          <div class="insight-card">
+            <div class="insight-card-head">
+              ${iconBox('trend','var(--purple-lt)','var(--purple)')}
+              <span class="insight-label" style="color:var(--purple)">Dispersion & Trend</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">
+                SD <strong>${sd.toFixed(4)}</strong> · Variance <strong>${vari.toFixed(4)}</strong> — ${sd > 1 ? '<strong>high spread</strong> across class values.' : '<strong>moderate spread</strong> across class values.'}
+                R² <strong>${lr.r2.toFixed(4)}</strong> — ${lr.r2 < 0.01 ? 'near-zero R² confirms <strong>random label order</strong>, no positional bias.' : '<strong>non-trivial R²</strong> — shuffle data before training.'}
+              </p>
+              <div class="inline-stats" style="margin-top:10px;">
+                <div class="istat"><span class="istat-val" style="color:var(--purple)">${sd.toFixed(3)}</span><span class="istat-lbl">Std Dev</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--muted)">${vari.toFixed(3)}</span><span class="istat-lbl">Variance</span></div>
+                <div class="istat"><span class="istat-val" style="color:var(--muted)">${lr.r2.toFixed(4)}</span><span class="istat-lbl">R²</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Clinical wide -->
+          <div class="insight-card wide">
+            <div class="insight-card-head">
+              ${iconBox('clinical','var(--normal-lt)','var(--normal)')}
+              <span class="insight-label" style="color:var(--normal)">Clinical Insight & Recommendations</span>
+            </div>
+            <div class="insight-card-body">
+              <p class="insight-text">Dominance of <strong>Normal sinus rhythm</strong> mirrors real-world ECG distributions. Rare arrhythmia classes (S, V, F, Q) carry the highest clinical stakes yet are systematically underrepresented. Standard accuracy metrics are misleading — prioritise class-level evaluation.</p>
+              <div class="chip-row">
+                <span class="chip chip-ok">Sensitivity per Class</span>
+                <span class="chip chip-ok">F1-Score Macro</span>
+                <span class="chip">Confusion Matrix</span>
+                <span class="chip">Precision-Recall Curve</span>
+                <span class="chip chip-warn">SMOTE / Augmentation</span>
+                <span class="chip chip-warn">Stratified K-Fold CV</span>
+              </div>
+            </div>
+          </div>
+
+        </div>`;
+      }
+
+      box.innerHTML = html;
     }
 
     document.addEventListener('DOMContentLoaded', loadDataset);
