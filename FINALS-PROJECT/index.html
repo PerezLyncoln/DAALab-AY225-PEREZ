@@ -702,8 +702,8 @@
 
         arrhythmiaCombinedData = [...arrhythmiaTrainData, ...arrhythmiaTestData];
 
-        renderECGTable(ecgData);
-        renderArrTable(arrhythmiaCombinedData);
+        renderECGTable(ecgData);     updateECGSummary(ecgData);
+        renderArrTable(arrhythmiaCombinedData); updateArrSummary(arrhythmiaCombinedData);
       } catch(e) { console.error('Load error:', e); }
     }
 
@@ -729,6 +729,17 @@
       event.target.classList.add('active');
       renderArrTable(data);
       updateArrSummary(data);
+    }
+
+    // ── Summary ──
+    function updateECGSummary(data) {
+      document.getElementById('ecgTotal').textContent    = data.length.toLocaleString();
+      document.getElementById('ecgNormal').textContent   = data.filter(d=>d.status==='Normal').length.toLocaleString();
+      document.getElementById('ecgAbnormal').textContent = data.filter(d=>d.status==='Abnormal').length.toLocaleString();
+    }
+    function updateArrSummary(data) {
+      document.getElementById('arrTotal').textContent = data.length.toLocaleString();
+      [0,1,2,3,4].forEach(c => { document.getElementById('c'+c).textContent = data.filter(d=>d.class===c).length.toLocaleString(); });
     }
 
     // ── ID Range builder — defaults to 1-100 ──
