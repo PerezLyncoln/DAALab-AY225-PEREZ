@@ -702,8 +702,8 @@
 
         arrhythmiaCombinedData = [...arrhythmiaTrainData, ...arrhythmiaTestData];
 
-        renderECGTable(ecgData);     updateECGSummary(ecgData);
-        renderArrTable(arrhythmiaCombinedData); updateArrSummary(arrhythmiaCombinedData);
+        renderECGTable(ecgData);
+        renderArrTable(arrhythmiaCombinedData);
       } catch(e) { console.error('Load error:', e); }
     }
 
