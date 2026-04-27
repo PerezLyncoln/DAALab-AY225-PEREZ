@@ -763,50 +763,7 @@
       applyECGFilters();
     }
 
-    function applyECGFilters(resetPage) {
-      const rng = document.getElementById('ecgIdRange').value;
-      const sts = document.getElementById('ecgStatusFilter').value;
-      const srt = document.getElementById('ecgSort').value;
-
-      let f = [...ecgData];
-      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
-      if (sts !== 'all') f = f.filter(r=>r.status===sts);
-      if (srt==='id')     f.sort((a,b)=>a.id-b.id);
-      if (srt==='status') f.sort((a,b)=>a.status.localeCompare(b.status));
-
-      ecgFiltered = f;
-      if (resetPage !== false) ecgPage = 1;
-
-      const isAll = (rng === 'all' && sts === 'all');
-      const needsPaging = f.length > PAGE_SIZE;
-
-      document.getElementById('ecgFilterCount').textContent = `${f.length.toLocaleString()} of ${ecgData.length.toLocaleString()} records`;
-
-      const display = needsPaging ? f.slice((ecgPage-1)*PAGE_SIZE, ecgPage*PAGE_SIZE) : f;
-
-      const tbody = document.querySelector('#ecgTable tbody');
-      tbody.innerHTML = '';
-      if (f.length===0) { tbody.innerHTML='<tr class="empty-row"><td colspan="2">No records match the selected filters.</td></tr>'; }
-      else {
-        display.forEach(row => {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
-            <td><span class="badge badge-${row.status.toLowerCase()}">${row.status}</span></td>`;
-          tbody.appendChild(tr);
-        });
-      }
-
-      renderPagination('ecg', f.length, ecgPage, needsPaging);
-    }
-
-    function resetECGFilters() {
-      const sel = document.getElementById('ecgIdRange');
-      if (sel.options.length > 1) sel.selectedIndex = 1;
-      document.getElementById('ecgStatusFilter').value = 'all';
-      document.getElementById('ecgSort').value = '';
-      ecgPage = 1;
-      applyECGFilters();
-    }
+    
 
     // ── Arrhythmia Table ──
     function renderArrTable(data) {
@@ -816,61 +773,7 @@
       applyArrFilters();
     }
 
-    function applyArrFilters(resetPage) {
-      const rng = document.getElementById('arrIdRange').value;
-      const cls = document.getElementById('arrClassFilter').value;
-      const srt = document.getElementById('arrSort').value;
-
-      const src = currentArrhythmiaView==='combined' ? arrhythmiaCombinedData : currentArrhythmiaView==='train' ? arrhythmiaTrainData : arrhythmiaTestData;
-      let f = [...src];
-      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
-      if (cls !== 'all') f = f.filter(r=>r.class===parseInt(cls));
-      if (srt==='id')    f.sort((a,b)=>a.id-b.id);
-      if (srt==='class') f.sort((a,b)=>a.class-b.class);
-
-      arrFiltered = f;
-      if (resetPage !== false) arrPage = 1;
-
-      const needsPaging = f.length > PAGE_SIZE;
-
-      document.getElementById('arrFilterCount').textContent = `${f.length.toLocaleString()} of ${src.length.toLocaleString()} records`;
-
-      const meta = {
-        0:{label:'N — Normal',          badge:'badge-n'},
-        1:{label:'S — Supraventricular',badge:'badge-s'},
-        2:{label:'V — Ventricular',     badge:'badge-v'},
-        3:{label:'F — Fusion',          badge:'badge-f'},
-        4:{label:'Q — Unknown',         badge:'badge-q'},
-      };
-      const tbody = document.querySelector('#arrTable tbody');
-      tbody.innerHTML = '';
-
-      if (f.length===0) {
-        tbody.innerHTML='<tr class="empty-row"><td colspan="3">No records match the selected filters.</td></tr>';
-      } else {
-        const display = needsPaging ? f.slice((arrPage-1)*PAGE_SIZE, arrPage*PAGE_SIZE) : f;
-        display.forEach(row => {
-          const m = meta[row.class]||{label:'Unknown',badge:'badge-q'};
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
-            <td><span class="badge badge-${row.dataset==='Training'?'train':'test'}">${row.dataset}</span></td>
-            <td><span class="badge ${m.badge}">${m.label}</span></td>`;
-          tbody.appendChild(tr);
-        });
-      }
-
-      renderPagination('arr', f.length, arrPage, needsPaging);
-    }
-
-    function resetArrFilters() {
-      const sel = document.getElementById('arrIdRange');
-      if (sel.options.length > 1) sel.selectedIndex = 1;
-      document.getElementById('arrClassFilter').value = 'all';
-      document.getElementById('arrSort').value = '';
-      arrPage = 1;
-      applyArrFilters();
-    }
-
+   
     // ── Pagination renderer ──
     function renderPagination(which, total, currentPage, show) {
       const el = document.getElementById(which + 'Pagination');
