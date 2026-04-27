@@ -511,14 +511,14 @@
       <div class="filter-bar">
         <div class="filter-group">
           <span class="filter-label">ID Range</span>
-          <select id="ecgIdRange" class="filter-select" onchange="applyECGFilters()">
+          <select id="ecgIdRange" class="filter-select" onchange="renderECGTable(ecgData)">
             <option value="all">All IDs</option>
           </select>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">Status</span>
-          <select id="ecgStatusFilter" class="filter-select" onchange="applyECGFilters()">
+          <select id="ecgStatusFilter" class="filter-select" onchange="renderECGTable(ecgData)">
             <option value="all">All</option>
             <option value="Normal">Normal</option>
             <option value="Abnormal">Abnormal</option>
@@ -527,13 +527,13 @@
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">Sort</span>
-          <select id="ecgSort" class="filter-select" onchange="applyECGFilters()">
+          <select id="ecgSort" class="filter-select" onchange="renderECGTable(ecgData)">
             <option value="">Default</option>
             <option value="id">By ID</option>
             <option value="status">By Status</option>
           </select>
         </div>
-        <button class="reset-btn" onclick="resetECGFilters()">
+        <button class="reset-btn" onclick="(function(){ const sel=document.getElementById('ecgIdRange'); if(sel.options.length>1) sel.selectedIndex=1; document.getElementById('ecgStatusFilter').value='all'; document.getElementById('ecgSort').value=''; ecgPage=1; renderECGTable(ecgData); })()">
           <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 2L2 10M2 2l8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Reset
         </button>
@@ -582,14 +582,14 @@
       <div class="filter-bar">
         <div class="filter-group">
           <span class="filter-label">ID Range</span>
-          <select id="arrIdRange" class="filter-select" onchange="applyArrFilters()">
+          <select id="arrIdRange" class="filter-select" onchange="renderArrTable(getArrSource())">
             <option value="all">All IDs</option>
           </select>
         </div>
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">Class</span>
-          <select id="arrClassFilter" class="filter-select" onchange="applyArrFilters()">
+          <select id="arrClassFilter" class="filter-select" onchange="renderArrTable(getArrSource())">
             <option value="all">All Classes</option>
             <option value="0">Normal (N)</option>
             <option value="1">Supraventricular (S)</option>
@@ -601,13 +601,13 @@
         <div class="filter-divider"></div>
         <div class="filter-group">
           <span class="filter-label">Sort</span>
-          <select id="arrSort" class="filter-select" onchange="applyArrFilters()">
+          <select id="arrSort" class="filter-select" onchange="renderArrTable(getArrSource())">
             <option value="">Default</option>
             <option value="id">By ID</option>
             <option value="class">By Class</option>
           </select>
         </div>
-        <button class="reset-btn" onclick="resetArrFilters()">
+        <button class="reset-btn" onclick="(function(){ const sel=document.getElementById('arrIdRange'); if(sel.options.length>1) sel.selectedIndex=1; document.getElementById('arrClassFilter').value='all'; document.getElementById('arrSort').value=''; arrPage=1; renderArrTable(getArrSource()); })()">
           <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 2L2 10M2 2l8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           Reset
         </button>
@@ -731,15 +731,8 @@
       updateArrSummary(data);
     }
 
-    // ── Summary ──
-    function updateECGSummary(data) {
-      document.getElementById('ecgTotal').textContent    = data.length.toLocaleString();
-      document.getElementById('ecgNormal').textContent   = data.filter(d=>d.status==='Normal').length.toLocaleString();
-      document.getElementById('ecgAbnormal').textContent = data.filter(d=>d.status==='Abnormal').length.toLocaleString();
-    }
-    function updateArrSummary(data) {
-      document.getElementById('arrTotal').textContent = data.length.toLocaleString();
-      [0,1,2,3,4].forEach(c => { document.getElementById('c'+c).textContent = data.filter(d=>d.class===c).length.toLocaleString(); });
+    function getArrSource() {
+      return currentArrhythmiaView==='combined' ? arrhythmiaCombinedData : currentArrhythmiaView==='train' ? arrhythmiaTrainData : arrhythmiaTestData;
     }
 
     // ── ID Range builder — defaults to 1-100 ──
@@ -758,22 +751,90 @@
     }
 
     // ── ECG Table ──
-    function renderECGTable(data) {
+    function renderECGTable(data, resetPage = true) {
       buildIdRangeOptions(data.length, 'ecgIdRange');
-      applyECGFilters();
-    }
+      const rng = document.getElementById('ecgIdRange').value;
+      const sts = document.getElementById('ecgStatusFilter').value;
+      const srt = document.getElementById('ecgSort').value;
 
-    
+      let f = [...data];
+      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
+      if (sts !== 'all') f = f.filter(r=>r.status===sts);
+      if (srt==='id')     f.sort((a,b)=>a.id-b.id);
+      if (srt==='status') f.sort((a,b)=>a.status.localeCompare(b.status));
+
+      ecgFiltered = f;
+      if (resetPage !== false) ecgPage = 1;
+
+      const needsPaging = f.length > PAGE_SIZE;
+      document.getElementById('ecgFilterCount').textContent = `${f.length.toLocaleString()} of ${ecgData.length.toLocaleString()} records`;
+
+      const display = needsPaging ? f.slice((ecgPage-1)*PAGE_SIZE, ecgPage*PAGE_SIZE) : f;
+
+      const tbody = document.querySelector('#ecgTable tbody');
+      tbody.innerHTML = '';
+      if (f.length===0) {
+        tbody.innerHTML='<tr class="empty-row"><td colspan="2">No records match the selected filters.</td></tr>';
+      } else {
+        display.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+            <td><span class="badge badge-${row.status.toLowerCase()}">${row.status}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      renderPagination('ecg', f.length, ecgPage, needsPaging);
+    }
 
     // ── Arrhythmia Table ──
-    function renderArrTable(data) {
+    function renderArrTable(data, resetPage = true) {
       buildIdRangeOptions(data.length, 'arrIdRange');
-      document.getElementById('arrClassFilter').value = 'all';
-      document.getElementById('arrSort').value = '';
-      applyArrFilters();
+      const rng = document.getElementById('arrIdRange').value;
+      const cls = document.getElementById('arrClassFilter').value;
+      const srt = document.getElementById('arrSort').value;
+
+      const src = data;
+      let f = [...src];
+      if (rng !== 'all') { const [lo,hi]=rng.split('-').map(Number); f=f.filter(r=>r.id>=lo&&r.id<=hi); }
+      if (cls !== 'all') f = f.filter(r=>r.class===parseInt(cls));
+      if (srt==='id')    f.sort((a,b)=>a.id-b.id);
+      if (srt==='class') f.sort((a,b)=>a.class-b.class);
+
+      arrFiltered = f;
+      if (resetPage !== false) arrPage = 1;
+
+      const needsPaging = f.length > PAGE_SIZE;
+
+      document.getElementById('arrFilterCount').textContent = `${f.length.toLocaleString()} of ${src.length.toLocaleString()} records`;
+
+      const meta = {
+        0:{label:'N — Normal',          badge:'badge-n'},
+        1:{label:'S — Supraventricular',badge:'badge-s'},
+        2:{label:'V — Ventricular',     badge:'badge-v'},
+        3:{label:'F — Fusion',          badge:'badge-f'},
+        4:{label:'Q — Unknown',         badge:'badge-q'},
+      };
+      const tbody = document.querySelector('#arrTable tbody');
+      tbody.innerHTML = '';
+
+      if (f.length===0) {
+        tbody.innerHTML='<tr class="empty-row"><td colspan="3">No records match the selected filters.</td></tr>';
+      } else {
+        const display = needsPaging ? f.slice((arrPage-1)*PAGE_SIZE, arrPage*PAGE_SIZE) : f;
+        display.forEach(row => {
+          const m = meta[row.class]||{label:'Unknown',badge:'badge-q'};
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td class="mono-id">#${String(row.id).padStart(5,'0')}</td>
+            <td><span class="badge badge-${row.dataset==='Training'?'train':'test'}">${row.dataset}</span></td>
+            <td><span class="badge ${m.badge}">${m.label}</span></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+
+      renderPagination('arr', f.length, arrPage, needsPaging);
     }
 
-   
     // ── Pagination renderer ──
     function renderPagination(which, total, currentPage, show) {
       const el = document.getElementById(which + 'Pagination');
@@ -821,10 +882,10 @@
     function goPage(which, page) {
       if (which === 'ecg') {
         ecgPage = page;
-        applyECGFilters(false);
+        renderECGTable(ecgData, false);
       } else {
         arrPage = page;
-        applyArrFilters(false);
+        renderArrTable(getArrSource(), false);
       }
       // Scroll table into view smoothly
       document.getElementById(which === 'ecg' ? 'ecgTable' : 'arrTable').closest('.table-wrap').scrollIntoView({behavior:'smooth', block:'start'});
