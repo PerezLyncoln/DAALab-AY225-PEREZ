@@ -141,9 +141,8 @@ FINALS-PROJECT/
 
 ## Credits
 
-**Course**: Data Structures and Algorithms Laboratory (AY 2024-2025)
-**Institution**: [Your Institution]
-**Student**: PEREZ
+**Course**: Design, Analysis and Algorithms
+**Students**: Perez, Lyncoln Luis & Marquez, Jam Macy
 
 ## License
 
