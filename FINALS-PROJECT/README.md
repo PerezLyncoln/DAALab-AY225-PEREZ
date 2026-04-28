@@ -28,13 +28,28 @@ CardioAnalysis is an interactive data analysis tool that processes and visualize
 
 ### Running the Program
 
-#### Option 1: Direct File Opening
+#### Option 1: Using Live Server Extension (Recommended)
+This is the easiest and recommended way to run the program:
+
+1. Install the **Live Server** extension in VS Code
+   - Open VS Code
+   - Go to Extensions (Ctrl+Shift+X)
+   - Search for "Live Server" by Ritwick Dey
+   - Click Install
+
+2. Open the project folder in VS Code
+
+3. Right-click on `index.html` and select **"Open with Live Server"**
+   - The dashboard will open automatically in your default browser
+   - The server will refresh automatically when you make changes
+
+#### Option 2: Direct File Opening
 1. Navigate to the `FINALS-PROJECT` folder
 2. Double-click `index.html` to open in your default web browser
 3. The dashboard will load immediately with the data visualization
 
-#### Option 2: Local Web Server (Recommended for best performance)
-If you have Python installed:
+#### Option 3: Using Python Local Web Server
+If you prefer to run a local server without VS Code extensions:
 
 ```bash
 # Navigate to the FINALS-PROJECT directory
@@ -52,21 +67,12 @@ Then open your browser and navigate to:
 http://localhost:8000
 ```
 
-#### Option 3: Using Node.js (if available)
-```bash
-# Install a simple HTTP server globally
-npm install -g http-server
-
-# Navigate to the folder and run
-http-server
-```
-
 ## Project Structure
 
 ```
 FINALS-PROJECT/
 ├── index.html              # Main dashboard interface
-├── finals-proj.html        # Alternative dashboard view
+├── finals-proj.html        # Project Instructions followed by the system
 ├── README.md              # This file
 │
 ├── Datasets:
